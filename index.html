@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Dynamic Ambient</title>
+    <title>The Backrooms - Multi-Platform</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -12,14 +12,16 @@
         @keyframes grain { 0% { transform: translate(0,0); } 50% { transform: translate(-1%, -1%); } 100% { transform: translate(1%, 1%); } }
         .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
         #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
-        canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); }
+        canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
         #move-zone, #look-zone { position: absolute; bottom: 0; width: 50%; height: 100%; z-index: 200; }
         #look-zone { right: 0; }
         #joystick-container { position: absolute; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; border: 1px solid rgba(255,255,255,0.2); pointer-events: none; }
         #joystick-knob { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.3); border-radius: 50%; }
+        #instructions { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; font-size: 10px; opacity: 0.5; z-index: 110; pointer-events: none; }
     </style>
 </head>
 <body>
+    <div id="instructions">PC: WASD to Move, Click to Look / Mobile: Touch Joysticks</div>
     <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
     <div id="move-zone"></div><div id="look-zone"></div>
@@ -34,7 +36,6 @@
         const VIEW_DISTANCE = 6;
         const mapData = new Map();
         const flickerList = [];
-
         const scene = new THREE.Scene();
         const fogColor = 0x9e956b;
         scene.fog = new THREE.Fog(fogColor, 2, 25);
@@ -51,8 +52,6 @@
         const ceilingMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
         const lampOnColor = new THREE.Color(0xffffff);
         const lampOffColor = new THREE.Color(0x444433);
-
-        // 環境光（AmbientLight）を変数として保持
         const ambientLight = new THREE.AmbientLight(0xfff5d1, 1.8);
         scene.add(ambientLight); 
 
@@ -62,6 +61,55 @@
             sway: { x: 0, y: 0, z: 0 }
         };
 
+        // --- 入力システム ---
+        const keys = { w: false, a: false, s: false, d: false };
+        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0 };
+
+        // キーボード
+        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+
+        // マウス視点移動（クリックでロック）
+        document.addEventListener('click', () => { if(!('ontouchstart' in window)) renderer.domElement.requestPointerLock(); });
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === renderer.domElement) {
+                player.rot.y -= e.movementX * 0.002;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
+            }
+        });
+
+        // モバイル操作
+        const moveZone = document.getElementById('move-zone');
+        const lookZone = document.getElementById('look-zone');
+        const joyCont = document.getElementById('joystick-container');
+        const joyKnob = document.getElementById('joystick-knob');
+
+        moveZone.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0]; input.moveId = t.identifier;
+            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 40) + 'px'; joyCont.style.top = (t.clientY - 40) + 'px';
+        });
+        moveZone.addEventListener('touchmove', e => {
+            for (let t of e.changedTouches) if (t.identifier === input.moveId) {
+                const r = joyCont.getBoundingClientRect();
+                input.moveX = (t.clientX - (r.left + 40)) / 40; input.moveY = (t.clientY - (r.top + 40)) / 40;
+                const d = Math.max(1, Math.sqrt(input.moveX**2 + input.moveY**2));
+                joyKnob.style.transform = `translate(${(input.moveX/d)*20}px, ${(input.moveY/d)*20}px)`;
+            }
+        });
+        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; joyCont.style.display = 'none'; });
+
+        lookZone.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
+        });
+        lookZone.addEventListener('touchmove', e => {
+            for (let t of e.changedTouches) if (t.identifier === input.lookId) {
+                player.rot.y -= (t.clientX - input.lastX) * 0.005;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - input.lastY) * 0.005));
+                input.lastX = t.clientX; input.lastY = t.clientY;
+            }
+        });
+
+        // --- マップ生成 ---
         function seededRandom(x, z) {
             const seed = x * 12345 + z * 67890;
             return (Math.abs(Math.sin(seed) * 10000) % 1);
@@ -86,7 +134,6 @@
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
             lamp.position.set(0, 2.98, 0);
             group.add(lamp);
-
             if (mode === "flicker") flickerList.push({ mesh: lamp, offset: lampRand * 20 });
 
             const walls = [];
@@ -125,74 +172,35 @@
             });
         }
 
-        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0 };
-        const moveZone = document.getElementById('move-zone');
-        const lookZone = document.getElementById('look-zone');
-        const joyCont = document.getElementById('joystick-container');
-        const joyKnob = document.getElementById('joystick-knob');
-
-        moveZone.addEventListener('touchstart', e => {
-            const t = e.changedTouches[0]; input.moveId = t.identifier;
-            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 40) + 'px'; joyCont.style.top = (t.clientY - 40) + 'px';
-        }, {passive: false});
-        moveZone.addEventListener('touchmove', e => {
-            for (let t of e.changedTouches) if (t.identifier === input.moveId) {
-                const r = joyCont.getBoundingClientRect();
-                input.moveX = (t.clientX - (r.left + 40)) / 40; input.moveY = (t.clientY - (r.top + 40)) / 40;
-                const d = Math.max(1, Math.sqrt(input.moveX**2 + input.moveY**2));
-                joyKnob.style.transform = `translate(${(input.moveX/d)*20}px, ${(input.moveY/d)*20}px)`;
-            }
-        }, {passive: false});
-        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; joyCont.style.display = 'none'; });
-
-        lookZone.addEventListener('touchstart', e => {
-            const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
-        }, {passive: false});
-        lookZone.addEventListener('touchmove', e => {
-            for (let t of e.changedTouches) if (t.identifier === input.lookId) {
-                player.rot.y -= (t.clientX - input.lastX) * 0.005;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - input.lastY) * 0.005));
-                input.lastX = t.clientX; input.lastY = t.clientY;
-            }
-        }, {passive: false});
-
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
             
-            // プレイヤーが現在いるタイルの情報を取得
             const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE);
             const pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
             const currentTile = mapData.get(`${px},${pz}`);
-
             let currentTileLightOn = true;
             
             flickerList.forEach(lamp => {
                 const on = (Math.sin(time * 50 + lamp.offset) * Math.cos(time * 15)) > -0.2;
                 lamp.mesh.material.emissiveIntensity = on ? 2.0 : 0.2;
-                lamp.mesh.material.emissive.copy(on ? lampOnColor : lampOffColor);
-                
-                // プレイヤーの真上のライトが点滅中なら、その状態を記録
-                if (lamp.mesh.parent === currentTile?.mesh) {
-                    currentTileLightOn = on;
-                }
+                if (lamp.mesh.parent === currentTile?.mesh) currentTileLightOn = on;
             });
 
-            // ★修正：足元の状態に合わせて全体の明るさ（AmbientLight）を変える
-            let targetIntensity = 1.8; // 通常の明るさ
-            if (currentTile?.mode === "off") {
-                targetIntensity = 0.7; // 常時消灯タイルでは少し暗く
-            } else if (currentTile?.mode === "flicker") {
-                targetIntensity = currentTileLightOn ? 1.8 : 0.7; // 点滅に合わせて明暗
-            }
-            
-            // 明るさの変化を滑らかにする
+            let targetIntensity = 1.8;
+            if (currentTile?.mode === "off") targetIntensity = 0.7;
+            else if (currentTile?.mode === "flicker") targetIntensity = currentTileLightOn ? 1.8 : 0.7;
             ambientLight.intensity += (targetIntensity - ambientLight.intensity) * 0.15;
 
-            const isMoving = Math.abs(input.moveX) > 0.01 || Math.abs(input.moveY) > 0.01;
-            if (isMoving) {
+            // 移動計算 (PC + Mobile)
+            let moveX = input.moveX;
+            let moveZ = input.moveY;
+            if (keys.w) moveZ = -1; if (keys.s) moveZ = 1;
+            if (keys.a) moveX = -1; if (keys.d) moveX = 1;
+
+            if (Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01) {
                 const s = 0.07;
-                const d = new THREE.Vector3(input.moveX, 0, input.moveY).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
+                const d = new THREE.Vector3(moveX, 0, moveZ).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 const pBox = new THREE.Box3(new THREE.Vector3(player.pos.x+d.x*s-0.3, 0.1, player.pos.z+d.z*s-0.3), new THREE.Vector3(player.pos.x+d.x*s+0.3, 2.5, player.pos.z+d.z*s+0.3));
                 let collide = false;
                 for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (pBox.intersectsBox(w)) collide = true;
@@ -202,7 +210,6 @@
 
             player.sway.x = Math.sin(time * 1.5) * 0.005;
             player.sway.y = Math.cos(time * 1.2) * 0.005;
-
             camera.position.copy(player.pos);
             camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, 0, 'YXZ'));
             
