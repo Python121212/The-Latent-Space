@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Multi-Platform</title>
+    <title>The Backrooms - Sprint Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -15,13 +15,13 @@
         canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
         #move-zone, #look-zone { position: absolute; bottom: 0; width: 50%; height: 100%; z-index: 200; }
         #look-zone { right: 0; }
-        #joystick-container { position: absolute; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; border: 1px solid rgba(255,255,255,0.2); pointer-events: none; }
-        #joystick-knob { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.3); border-radius: 50%; }
+        #joystick-container { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; pointer-events: none; }
+        #joystick-knob { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; }
         #instructions { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; font-size: 10px; opacity: 0.5; z-index: 110; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="instructions">PC: WASD to Move, Click to Look / Mobile: Touch Joysticks</div>
+    <div id="instructions">PC: WASD to Move, SHIFT to Sprint / Mobile: Drag Joy further to Sprint</div>
     <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
     <div id="move-zone"></div><div id="look-zone"></div>
@@ -58,18 +58,24 @@
         const player = { 
             pos: new THREE.Vector3(0, 1.6, 0), 
             rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
-            sway: { x: 0, y: 0, z: 0 }
+            sway: { x: 0, y: 0, z: 0 },
+            isSprinting: false
         };
 
-        // --- 入力システム ---
-        const keys = { w: false, a: false, s: false, d: false };
-        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0 };
+        const keys = { w: false, a: false, s: false, d: false, shift: false };
+        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0, joyDist: 0 };
 
-        // キーボード
-        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+        window.addEventListener('keydown', e => { 
+            const k = e.key.toLowerCase();
+            if(keys.hasOwnProperty(k)) keys[k] = true; 
+            if(e.key === 'Shift') keys.shift = true;
+        });
+        window.addEventListener('keyup', e => { 
+            const k = e.key.toLowerCase();
+            if(keys.hasOwnProperty(k)) keys[k] = false; 
+            if(e.key === 'Shift') keys.shift = false;
+        });
 
-        // マウス視点移動（クリックでロック）
         document.addEventListener('click', () => { if(!('ontouchstart' in window)) renderer.domElement.requestPointerLock(); });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
@@ -78,7 +84,6 @@
             }
         });
 
-        // モバイル操作
         const moveZone = document.getElementById('move-zone');
         const lookZone = document.getElementById('look-zone');
         const joyCont = document.getElementById('joystick-container');
@@ -86,17 +91,23 @@
 
         moveZone.addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.moveId = t.identifier;
-            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 40) + 'px'; joyCont.style.top = (t.clientY - 40) + 'px';
+            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 50) + 'px'; joyCont.style.top = (t.clientY - 50) + 'px';
         });
         moveZone.addEventListener('touchmove', e => {
             for (let t of e.changedTouches) if (t.identifier === input.moveId) {
                 const r = joyCont.getBoundingClientRect();
-                input.moveX = (t.clientX - (r.left + 40)) / 40; input.moveY = (t.clientY - (r.top + 40)) / 40;
-                const d = Math.max(1, Math.sqrt(input.moveX**2 + input.moveY**2));
-                joyKnob.style.transform = `translate(${(input.moveX/d)*20}px, ${(input.moveY/d)*20}px)`;
+                const dx = t.clientX - (r.left + 50);
+                const dy = t.clientY - (r.top + 50);
+                input.joyDist = Math.sqrt(dx*dx + dy*dy);
+                const angle = Math.atan2(dy, dx);
+                const limit = Math.min(input.joyDist, 40);
+                
+                input.moveX = (limit * Math.cos(angle)) / 40;
+                input.moveY = (limit * Math.sin(angle)) / 40;
+                joyKnob.style.transform = `translate(${input.moveX * 30}px, ${input.moveY * 30}px)`;
             }
         });
-        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; joyCont.style.display = 'none'; });
+        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; joyCont.style.display = 'none'; });
 
         lookZone.addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
@@ -109,7 +120,6 @@
             }
         });
 
-        // --- マップ生成 ---
         function seededRandom(x, z) {
             const seed = x * 12345 + z * 67890;
             return (Math.abs(Math.sin(seed) * 10000) % 1);
@@ -192,26 +202,38 @@
             else if (currentTile?.mode === "flicker") targetIntensity = currentTileLightOn ? 1.8 : 0.7;
             ambientLight.intensity += (targetIntensity - ambientLight.intensity) * 0.15;
 
-            // 移動計算 (PC + Mobile)
+            // --- 移動とダッシュのロジック ---
             let moveX = input.moveX;
             let moveZ = input.moveY;
             if (keys.w) moveZ = -1; if (keys.s) moveZ = 1;
             if (keys.a) moveX = -1; if (keys.d) moveX = 1;
 
+            // ダッシュ判定 (PC: Shift, Mobile: ジョイスティックを大きく倒す)
+            player.isSprinting = keys.shift || input.joyDist > 55;
+            const speed = player.isSprinting ? 0.13 : 0.07;
+            const bobFreq = player.isSprinting ? 18 : 12;
+            const bobAmp = player.isSprinting ? 0.05 : 0.025;
+
             if (Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01) {
-                const s = 0.07;
                 const d = new THREE.Vector3(moveX, 0, moveZ).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                const pBox = new THREE.Box3(new THREE.Vector3(player.pos.x+d.x*s-0.3, 0.1, player.pos.z+d.z*s-0.3), new THREE.Vector3(player.pos.x+d.x*s+0.3, 2.5, player.pos.z+d.z*s+0.3));
+                const pBox = new THREE.Box3(new THREE.Vector3(player.pos.x+d.x*speed-0.3, 0.1, player.pos.z+d.z*speed-0.3), new THREE.Vector3(player.pos.x+d.x*speed+0.3, 2.5, player.pos.z+d.z*speed+0.3));
                 let collide = false;
                 for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (pBox.intersectsBox(w)) collide = true;
-                if (!collide) { player.pos.x += d.x*s; player.pos.z += d.z*s; }
-                player.pos.y = 1.6 + Math.sin(time * 12) * 0.025;
-            } else { player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; }
+                if (!collide) { player.pos.x += d.x*speed; player.pos.z += d.z*speed; }
+                
+                // 歩行/走行の揺れ
+                player.pos.y = 1.6 + Math.sin(time * bobFreq) * bobAmp;
+                player.sway.z = Math.sin(time * (bobFreq/2)) * (player.isSprinting ? 0.04 : 0.01);
+            } else { 
+                player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; 
+                player.sway.z *= 0.9;
+            }
 
             player.sway.x = Math.sin(time * 1.5) * 0.005;
             player.sway.y = Math.cos(time * 1.2) * 0.005;
             camera.position.copy(player.pos);
-            camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, 0, 'YXZ'));
+            // 走っている時は少しだけ前傾姿勢にするなどの微調整
+            camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, player.sway.z, 'YXZ'));
             
             updateMap();
             renderer.render(scene, camera);
