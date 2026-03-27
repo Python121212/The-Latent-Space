@@ -3,79 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Stamina System</title>
+    <title>The Backrooms - Lighting & Smooth Stamina</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
         .scanlines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 2px, transparent 4px); opacity: 0.4; }
         .noise { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://www.transparenttextures.com/patterns/stardust.png'); opacity: 0.1; animation: grain 0.1s steps(2) infinite; }
         @keyframes grain { 0% { transform: translate(0,0); } 50% { transform: translate(-1%, -1%); } 100% { transform: translate(1%, 1%); } }
-        .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
-        #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; line-height: 1.5; }
-        
-        /* スタミナバーのスタイル */
+        .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.8) 150%); z-index: 106; }
+        #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
         #stamina-container { width: 120px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); margin-top: 10px; }
-        #stamina-bar { width: 100%; height: 100%; background: #e0e0e0; transition: width 0.1s linear; }
-
-        canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
-        #move-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 100%; z-index: 200; }
-        #look-zone { position: absolute; bottom: 0; right: 0; width: 50%; height: 100%; z-index: 200; }
+        #stamina-bar { width: 100%; height: 100%; background: #e0e0e0; }
+        canvas { filter: contrast(1.2) saturate(0.8) blur(0.4px); cursor: crosshair; }
+        #move-zone, #look-zone { position: absolute; bottom: 0; width: 50%; height: 100%; z-index: 200; }
+        #move-zone { left: 0; } #look-zone { right: 0; }
         #joystick-container { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; pointer-events: none; }
         #joystick-knob { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; }
-        #sprint-btn { 
-            position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; 
-            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); 
-            border-radius: 50%; color: white; font-family: sans-serif; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; 
-            z-index: 300; font-size: 12px; -webkit-tap-highlight-color: transparent;
-        }
-        #sprint-btn.active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
+        #sprint-btn { position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; z-index: 300; font-size: 12px; }
+        #sprint-btn.active { background: rgba(255,255,255,0.4); }
     </style>
 </head>
 <body>
-    <div id="ui">
-        [REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991
-        <div id="stamina-container"><div id="stamina-bar"></div></div>
-    </div>
+    <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991<div id="stamina-container"><div id="stamina-bar"></div></div></div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
     <div id="move-zone"></div><div id="look-zone"></div>
     <div id="sprint-btn">RUN</div>
     <div id="joystick-container"><div id="joystick-knob"></div></div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
-
     <script type="module">
         import * as THREE from 'three';
 
         const TILE_SIZE = 5;
-        const VIEW_DISTANCE = 6;
+        const VIEW_DISTANCE = 5;
         const mapData = new Map();
         const flickerList = [];
         const scene = new THREE.Scene();
-        const fogColor = 0x9e956b;
-        scene.fog = new THREE.Fog(fogColor, 1, 25);
+        const fogColor = 0x1a1a10; // 霧を暗く
+        scene.fog = new THREE.Fog(fogColor, 1, 15);
         scene.background = new THREE.Color(fogColor);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.8); 
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xfff5d1, 2.2);
+        // ライティング調整
+        const ambientLight = new THREE.AmbientLight(0xfff5d1, 0.3); // 全体をかなり暗く
         scene.add(ambientLight); 
+        
+        const playerLight = new THREE.PointLight(0xfff5d1, 15, 8); // プレイヤーの周りだけ明るく
+        scene.add(playerLight);
 
-        const wallMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
-        const floorMat = new THREE.MeshLambertMaterial({ color: 0xc4bc8b });
-        const ceilingMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x9e956b, roughness: 0.8 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x8a825d, roughness: 0.9 });
+        const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x9e956b, roughness: 0.8 });
 
         const player = { 
-            pos: new THREE.Vector3(0, 1.6, 0), 
-            rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
-            sway: { x: 0, y: 0, z: 0 },
-            isSprinting: false,
-            stamina: 100, // スタミナ初期値
-            maxStamina: 100
+            pos: new THREE.Vector3(0, 1.6, 0), rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
+            sway: { x: 0, y: 0, z: 0 }, isSprinting: false,
+            stamina: 100, maxStamina: 100, isExhausted: false // 疲れきった状態フラグ
         };
 
         const keys = { w: false, a: false, s: false, d: false, shift: false };
@@ -83,41 +71,29 @@
 
         window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; if(e.key === 'Shift') keys.shift = true; });
         window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; if(e.key === 'Shift') keys.shift = false; });
-
-        document.addEventListener('click', (e) => { if(e.target.id !== 'sprint-btn' && !('ontouchstart' in window)) renderer.domElement.requestPointerLock(); });
-        document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.002;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
-            }
-        });
-
-        const sprintBtn = document.getElementById('sprint-btn');
-        const staminaBar = document.getElementById('stamina-bar');
-        const joyCont = document.getElementById('joystick-container');
-        const joyKnob = document.getElementById('joystick-knob');
-        const setSprint = (val) => { input.btnSprint = val; val ? sprintBtn.classList.add('active') : sprintBtn.classList.remove('active'); };
         
+        const sprintBtn = document.getElementById('sprint-btn');
+        const setSprint = (val) => { input.btnSprint = val; val ? sprintBtn.classList.add('active') : sprintBtn.classList.remove('active'); };
         sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setSprint(true); });
         sprintBtn.addEventListener('touchend', () => setSprint(false));
-        sprintBtn.addEventListener('mousedown', () => setSprint(true));
-        sprintBtn.addEventListener('mouseup', () => setSprint(false));
 
+        // ジョイスティック・タッチ操作 (省略せず維持)
         document.getElementById('move-zone').addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.moveId = t.identifier;
-            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 50) + 'px'; joyCont.style.top = (t.clientY - 50) + 'px';
+            const j = document.getElementById('joystick-container');
+            j.style.display = 'block'; j.style.left = (t.clientX - 50) + 'px'; j.style.top = (t.clientY - 50) + 'px';
         });
         document.getElementById('move-zone').addEventListener('touchmove', e => {
             for (let t of e.changedTouches) if (t.identifier === input.moveId) {
-                const r = joyCont.getBoundingClientRect();
+                const r = document.getElementById('joystick-container').getBoundingClientRect();
                 const dx = t.clientX - (r.left + 50), dy = t.clientY - (r.top + 50);
                 input.joyDist = Math.sqrt(dx*dx + dy*dy);
                 const angle = Math.atan2(dy, dx), limit = Math.min(input.joyDist, 40);
                 input.moveX = (limit * Math.cos(angle)) / 40; input.moveY = (limit * Math.sin(angle)) / 40;
-                joyKnob.style.transform = `translate(${input.moveX * 30}px, ${input.moveY * 30}px)`;
+                document.getElementById('joystick-knob').style.transform = `translate(${input.moveX * 30}px, ${input.moveY * 30}px)`;
             }
         });
-        document.getElementById('move-zone').addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; joyCont.style.display = 'none'; });
+        document.getElementById('move-zone').addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; document.getElementById('joystick-container').style.display = 'none'; });
 
         document.getElementById('look-zone').addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
@@ -137,15 +113,31 @@
             group.add(new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat).rotateX(-Math.PI/2));
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), ceilingMat).rotateX(Math.PI/2);
             ceil.position.y = 3; group.add(ceil);
+            
             const r = seededRandom(tx + 100, tz + 100);
-            const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: (r > 0.95) ? 0x222211 : 0xffffff, emissiveIntensity: (r > 0.95) ? 0.2 : 2.5 });
+            const isDark = r > 0.93; // 一部のタイルは完全に消灯
+            const isFlicker = r > 0.85 && r <= 0.93;
+
+            const lampMat = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, 
+                emissive: isDark ? 0x000000 : 0xffffff, 
+                emissiveIntensity: isDark ? 0 : 2.0 
+            });
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
             lamp.position.set(0, 2.98, 0); group.add(lamp);
-            if (r > 0.85 && r <= 0.95) flickerList.push({ mesh: lamp, offset: r * 20 });
+
+            // 消えていない場所には補助ライトを置く（周囲への光漏れ）
+            if (!isDark) {
+                const light = new THREE.PointLight(0xfff5d1, 8, 6);
+                light.position.set(0, 2.5, 0);
+                group.add(light);
+                if (isFlicker) flickerList.push({ mesh: lamp, light: light, offset: r * 20 });
+            }
+
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
                 [[0, 1.5, 2.5, 5, 3, 0.4], [2.5, 1.5, 0, 0.4, 3, 5]].forEach((c, i) => {
-                    if (seededRandom(tx + (i?5:0), tz + (i?0:5)) > 0.68) {
+                    if (seededRandom(tx + (i?5:0), tz + (i?0:5)) > 0.7) {
                         const wall = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
                         wall.position.set(c[0], c[1], c[2]); group.add(wall);
                         walls.push(new THREE.Box3().setFromObject(wall).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
@@ -165,13 +157,6 @@
                     else { scene.add(mapData.get(key).mesh); }
                 }
             }
-            mapData.forEach((t, k) => {
-                const [tx, tz] = k.split(',').map(Number);
-                if (Math.abs(tx-px) > VIEW_DISTANCE || Math.abs(tz-pz) > VIEW_DISTANCE) {
-                    scene.remove(t.mesh);
-                    for(let i=flickerList.length-1; i>=0; i--) if(flickerList[i].mesh.parent===t.mesh) flickerList.splice(i,1);
-                }
-            });
         }
 
         function checkCollision(box) {
@@ -182,44 +167,46 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
-            flickerList.forEach(l => l.mesh.material.emissiveIntensity = ((Math.sin(time * 50 + l.offset) * Math.cos(time * 15)) > -0.2) ? 2.5 : 0.2);
+            flickerList.forEach(l => {
+                const flicker = (Math.sin(time * 50 + l.offset) * Math.cos(time * 15)) > -0.2;
+                l.mesh.material.emissiveIntensity = flicker ? 2.0 : 0.1;
+                l.light.intensity = flicker ? 8 : 0.5;
+            });
 
             let mx = input.moveX, mz = input.moveY;
             if (keys.w) mz = -1; if (keys.s) mz = 1; if (keys.a) mx = -1; if (keys.d) mx = 1;
             const isMoving = Math.abs(mx) > 0.01 || Math.abs(mz) > 0.01;
 
-            // スタミナの処理
+            // スタミナ・がくがく防止ロジック
             const wantToSprint = keys.shift || input.btnSprint || input.joyDist > 55;
-            if (wantToSprint && isMoving && player.stamina > 0) {
+            if (player.stamina <= 0) player.isExhausted = true;
+            if (player.stamina > 20) player.isExhausted = false; // 20%まで回復したら走れる
+
+            if (wantToSprint && isMoving && !player.isExhausted) {
                 player.isSprinting = true;
-                player.stamina = Math.max(0, player.stamina - 0.4); // 走ると減る
+                player.stamina = Math.max(0, player.stamina - 0.5);
             } else {
                 player.isSprinting = false;
-                player.stamina = Math.min(player.maxStamina, player.stamina + 0.2); // 止まっている/歩くと増える
+                player.stamina = Math.min(player.maxStamina, player.stamina + 0.3);
             }
-            staminaBar.style.width = player.stamina + '%';
+            document.getElementById('stamina-bar').style.width = player.stamina + '%';
 
             const speed = player.isSprinting ? 0.14 : 0.07;
-
             if (isMoving) {
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                
-                const nextX = player.pos.x + dir.x * speed;
-                const boxX = new THREE.Box3(new THREE.Vector3(nextX-0.3, 0.1, player.pos.z-0.3), new THREE.Vector3(nextX+0.3, 2.5, player.pos.z+0.3));
-                if (!checkCollision(boxX)) player.pos.x = nextX;
-
-                const nextZ = player.pos.z + dir.z * speed;
-                const boxZ = new THREE.Box3(new THREE.Vector3(player.pos.x-0.3, 0.1, nextZ-0.3), new THREE.Vector3(player.pos.x+0.3, 2.5, nextZ+0.3));
-                if (!checkCollision(boxZ)) player.pos.z = nextZ;
-
+                [ ['x', 'z'], ['z', 'x'] ].forEach(axis => {
+                    const next = player.pos[axis[0]] + dir[axis[0]] * speed;
+                    const box = new THREE.Box3().setFromCenterAndSize(player.pos.clone().setComponent(axis[0] === 'x' ? 0 : 2, next), new THREE.Vector3(0.6, 2, 0.6));
+                    if (!checkCollision(box)) player.pos[axis[0]] = next;
+                });
                 const bob = player.isSprinting ? 18 : 12;
-                player.pos.y = 1.6 + Math.sin(time * bob) * (player.isSprinting ? 0.06 : 0.025);
+                player.pos.y = 1.6 + Math.sin(time * bob) * (player.isSprinting ? 0.06 : 0.02);
                 player.sway.z = Math.sin(time * (bob/2)) * (player.isSprinting ? 0.04 : 0.01);
             } else { player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; player.sway.z *= 0.9; }
 
-            player.sway.x = Math.sin(time * 1.5) * 0.005; player.sway.y = Math.cos(time * 1.2) * 0.005;
+            playerLight.position.copy(player.pos);
             camera.position.copy(player.pos);
-            camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, player.sway.z, 'YXZ'));
+            camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + Math.sin(time*1.5)*0.005, player.rot.y, player.sway.z, 'YXZ'));
             
             updateMap();
             renderer.render(scene, camera);
