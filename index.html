@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Backrooms - Dynamic Ambient</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
+        #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
+        .scanlines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 2px, transparent 4px); opacity: 0.4; }
+        .noise { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://www.transparenttextures.com/patterns/stardust.png'); opacity: 0.1; animation: grain 0.1s steps(2) infinite; }
+        @keyframes grain { 0% { transform: translate(0,0); } 50% { transform: translate(-1%, -1%); } 100% { transform: translate(1%, 1%); } }
+        .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
+        #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
+        canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); }
+        #move-zone, #look-zone { position: absolute; bottom: 0; width: 50%; height: 100%; z-index: 200; }
+        #look-zone { right: 0; }
+        #joystick-container { position: absolute; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; border: 1px solid rgba(255,255,255,0.2); pointer-events: none; }
+        #joystick-knob { position: absolute; top: 20px; left: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.3); border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
+    <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
+    <div id="move-zone"></div><div id="look-zone"></div>
+    <div id="joystick-container"><div id="joystick-knob"></div></div>
+
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        const TILE_SIZE = 5;
+        const VIEW_DISTANCE = 6;
+        const mapData = new Map();
+        const flickerList = [];
+
+        const scene = new THREE.Scene();
+        const fogColor = 0x9e956b;
+        scene.fog = new THREE.Fog(fogColor, 2, 25);
+        scene.background = new THREE.Color(fogColor);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.7); 
+        document.body.appendChild(renderer.domElement);
+
+        const wallMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0xc4bc8b });
+        const ceilingMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
+        const lampOnColor = new THREE.Color(0xffffff);
+        const lampOffColor = new THREE.Color(0x444433);
+
+        // 環境光（AmbientLight）を変数として保持
+        const ambientLight = new THREE.AmbientLight(0xfff5d1, 1.8);
+        scene.add(ambientLight); 
+
+        const player = { 
+            pos: new THREE.Vector3(0, 1.6, 0), 
+            rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
+            sway: { x: 0, y: 0, z: 0 }
+        };
+
+        function seededRandom(x, z) {
+            const seed = x * 12345 + z * 67890;
+            return (Math.abs(Math.sin(seed) * 10000) % 1);
+        }
+
+        function createTile(tx, tz) {
+            const group = new THREE.Group();
+            group.add(new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat).rotateX(-Math.PI/2));
+            const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), ceilingMat).rotateX(Math.PI/2);
+            ceil.position.y = 3; group.add(ceil);
+
+            const lampRand = seededRandom(tx + 100, tz + 100);
+            let mode = "on";
+            if (lampRand > 0.92) mode = "off";
+            else if (lampRand > 0.82) mode = "flicker";
+
+            const lampMat = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, 
+                emissive: (mode === "off") ? lampOffColor : lampOnColor,
+                emissiveIntensity: (mode === "off") ? 0.2 : 2.0
+            });
+            const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
+            lamp.position.set(0, 2.98, 0);
+            group.add(lamp);
+
+            if (mode === "flicker") flickerList.push({ mesh: lamp, offset: lampRand * 20 });
+
+            const walls = [];
+            if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
+                const configs = [{ p: [0, 1.5, TILE_SIZE/2], s: [TILE_SIZE, 3, 0.4], id: 'N' }, { p: [TILE_SIZE/2, 1.5, 0], s: [0.4, 3, TILE_SIZE], id: 'E' }];
+                configs.forEach(c => {
+                    if (seededRandom(tx + (c.id==='E'?5:0), tz + (c.id==='N'?5:0)) > 0.68) {
+                        const wall = new THREE.Mesh(new THREE.BoxGeometry(...c.s), wallMat);
+                        wall.position.set(...c.p); group.add(wall);
+                        const box = new THREE.Box3().setFromObject(wall).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE));
+                        walls.push(box);
+                    }
+                });
+            }
+            group.position.set(tx * TILE_SIZE, 0, tz * TILE_SIZE);
+            return { mesh: group, walls: walls, mode: mode };
+        }
+
+        function updateMap() {
+            const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE);
+            const pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
+            for (let x = px-VIEW_DISTANCE; x <= px+VIEW_DISTANCE; x++) {
+                for (let z = pz-VIEW_DISTANCE; z <= pz+VIEW_DISTANCE; z++) {
+                    const key = `${x},${z}`;
+                    if (!mapData.has(key)) {
+                        const t = createTile(x, z); mapData.set(key, t); scene.add(t.mesh);
+                    } else { scene.add(mapData.get(key).mesh); }
+                }
+            }
+            mapData.forEach((t, k) => {
+                const [tx, tz] = k.split(',').map(Number);
+                if (Math.abs(tx-px) > VIEW_DISTANCE || Math.abs(tz-pz) > VIEW_DISTANCE) {
+                    scene.remove(t.mesh);
+                    for(let i=flickerList.length-1; i>=0; i--) if(flickerList[i].mesh.parent===t.mesh) flickerList.splice(i,1);
+                }
+            });
+        }
+
+        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0 };
+        const moveZone = document.getElementById('move-zone');
+        const lookZone = document.getElementById('look-zone');
+        const joyCont = document.getElementById('joystick-container');
+        const joyKnob = document.getElementById('joystick-knob');
+
+        moveZone.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0]; input.moveId = t.identifier;
+            joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 40) + 'px'; joyCont.style.top = (t.clientY - 40) + 'px';
+        }, {passive: false});
+        moveZone.addEventListener('touchmove', e => {
+            for (let t of e.changedTouches) if (t.identifier === input.moveId) {
+                const r = joyCont.getBoundingClientRect();
+                input.moveX = (t.clientX - (r.left + 40)) / 40; input.moveY = (t.clientY - (r.top + 40)) / 40;
+                const d = Math.max(1, Math.sqrt(input.moveX**2 + input.moveY**2));
+                joyKnob.style.transform = `translate(${(input.moveX/d)*20}px, ${(input.moveY/d)*20}px)`;
+            }
+        }, {passive: false});
+        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; joyCont.style.display = 'none'; });
+
+        lookZone.addEventListener('touchstart', e => {
+            const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
+        }, {passive: false});
+        lookZone.addEventListener('touchmove', e => {
+            for (let t of e.changedTouches) if (t.identifier === input.lookId) {
+                player.rot.y -= (t.clientX - input.lastX) * 0.005;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - input.lastY) * 0.005));
+                input.lastX = t.clientX; input.lastY = t.clientY;
+            }
+        }, {passive: false});
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now() * 0.001;
+            
+            // プレイヤーが現在いるタイルの情報を取得
+            const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE);
+            const pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
+            const currentTile = mapData.get(`${px},${pz}`);
+
+            let currentTileLightOn = true;
+            
+            flickerList.forEach(lamp => {
+                const on = (Math.sin(time * 50 + lamp.offset) * Math.cos(time * 15)) > -0.2;
+                lamp.mesh.material.emissiveIntensity = on ? 2.0 : 0.2;
+                lamp.mesh.material.emissive.copy(on ? lampOnColor : lampOffColor);
+                
+                // プレイヤーの真上のライトが点滅中なら、その状態を記録
+                if (lamp.mesh.parent === currentTile?.mesh) {
+                    currentTileLightOn = on;
+                }
+            });
+
+            // ★修正：足元の状態に合わせて全体の明るさ（AmbientLight）を変える
+            let targetIntensity = 1.8; // 通常の明るさ
+            if (currentTile?.mode === "off") {
+                targetIntensity = 0.7; // 常時消灯タイルでは少し暗く
+            } else if (currentTile?.mode === "flicker") {
+                targetIntensity = currentTileLightOn ? 1.8 : 0.7; // 点滅に合わせて明暗
+            }
+            
+            // 明るさの変化を滑らかにする
+            ambientLight.intensity += (targetIntensity - ambientLight.intensity) * 0.15;
+
+            const isMoving = Math.abs(input.moveX) > 0.01 || Math.abs(input.moveY) > 0.01;
+            if (isMoving) {
+                const s = 0.07;
+                const d = new THREE.Vector3(input.moveX, 0, input.moveY).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
+                const pBox = new THREE.Box3(new THREE.Vector3(player.pos.x+d.x*s-0.3, 0.1, player.pos.z+d.z*s-0.3), new THREE.Vector3(player.pos.x+d.x*s+0.3, 2.5, player.pos.z+d.z*s+0.3));
+                let collide = false;
+                for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (pBox.intersectsBox(w)) collide = true;
+                if (!collide) { player.pos.x += d.x*s; player.pos.z += d.z*s; }
+                player.pos.y = 1.6 + Math.sin(time * 12) * 0.025;
+            } else { player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; }
+
+            player.sway.x = Math.sin(time * 1.5) * 0.005;
+            player.sway.y = Math.cos(time * 1.2) * 0.005;
+
+            camera.position.copy(player.pos);
+            camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, 0, 'YXZ'));
+            
+            updateMap();
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
