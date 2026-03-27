@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Optimized Light</title>
+    <title>The Backrooms - Stamina System</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -11,7 +11,12 @@
         .noise { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('https://www.transparenttextures.com/patterns/stardust.png'); opacity: 0.1; animation: grain 0.1s steps(2) infinite; }
         @keyframes grain { 0% { transform: translate(0,0); } 50% { transform: translate(-1%, -1%); } 100% { transform: translate(1%, 1%); } }
         .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
-        #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
+        #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; line-height: 1.5; }
+        
+        /* スタミナバーのスタイル */
+        #stamina-container { width: 120px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); margin-top: 10px; }
+        #stamina-bar { width: 100%; height: 100%; background: #e0e0e0; transition: width 0.1s linear; }
+
         canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
         #move-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 100%; z-index: 200; }
         #look-zone { position: absolute; bottom: 0; right: 0; width: 50%; height: 100%; z-index: 200; }
@@ -28,7 +33,10 @@
     </style>
 </head>
 <body>
-    <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
+    <div id="ui">
+        [REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991
+        <div id="stamina-container"><div id="stamina-bar"></div></div>
+    </div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
     <div id="move-zone"></div><div id="look-zone"></div>
     <div id="sprint-btn">RUN</div>
@@ -54,7 +62,6 @@
         renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.8); 
         document.body.appendChild(renderer.domElement);
 
-        // ライトを1つに集約（明るさは高めに設定）
         const ambientLight = new THREE.AmbientLight(0xfff5d1, 2.2);
         scene.add(ambientLight); 
 
@@ -66,7 +73,9 @@
             pos: new THREE.Vector3(0, 1.6, 0), 
             rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
             sway: { x: 0, y: 0, z: 0 },
-            isSprinting: false
+            isSprinting: false,
+            stamina: 100, // スタミナ初期値
+            maxStamina: 100
         };
 
         const keys = { w: false, a: false, s: false, d: false, shift: false };
@@ -84,6 +93,7 @@
         });
 
         const sprintBtn = document.getElementById('sprint-btn');
+        const staminaBar = document.getElementById('stamina-bar');
         const joyCont = document.getElementById('joystick-container');
         const joyKnob = document.getElementById('joystick-knob');
         const setSprint = (val) => { input.btnSprint = val; val ? sprintBtn.classList.add('active') : sprintBtn.classList.remove('active'); };
@@ -127,19 +137,11 @@
             group.add(new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat).rotateX(-Math.PI/2));
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), ceilingMat).rotateX(Math.PI/2);
             ceil.position.y = 3; group.add(ceil);
-            
             const r = seededRandom(tx + 100, tz + 100);
-            // 物理的なライト（PointLight）は作らず、マテリアルの発光のみ設定
-            const lampMat = new THREE.MeshStandardMaterial({ 
-                color: 0x222222, 
-                emissive: (r > 0.95) ? 0x222211 : 0xffffff, 
-                emissiveIntensity: (r > 0.95) ? 0.2 : 2.5 
-            });
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: (r > 0.95) ? 0x222211 : 0xffffff, emissiveIntensity: (r > 0.95) ? 0.2 : 2.5 });
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
             lamp.position.set(0, 2.98, 0); group.add(lamp);
-            
             if (r > 0.85 && r <= 0.95) flickerList.push({ mesh: lamp, offset: r * 20 });
-            
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
                 [[0, 1.5, 2.5, 5, 3, 0.4], [2.5, 1.5, 0, 0.4, 3, 5]].forEach((c, i) => {
@@ -184,10 +186,22 @@
 
             let mx = input.moveX, mz = input.moveY;
             if (keys.w) mz = -1; if (keys.s) mz = 1; if (keys.a) mx = -1; if (keys.d) mx = 1;
-            player.isSprinting = keys.shift || input.btnSprint || input.joyDist > 55;
+            const isMoving = Math.abs(mx) > 0.01 || Math.abs(mz) > 0.01;
+
+            // スタミナの処理
+            const wantToSprint = keys.shift || input.btnSprint || input.joyDist > 55;
+            if (wantToSprint && isMoving && player.stamina > 0) {
+                player.isSprinting = true;
+                player.stamina = Math.max(0, player.stamina - 0.4); // 走ると減る
+            } else {
+                player.isSprinting = false;
+                player.stamina = Math.min(player.maxStamina, player.stamina + 0.2); // 止まっている/歩くと増える
+            }
+            staminaBar.style.width = player.stamina + '%';
+
             const speed = player.isSprinting ? 0.14 : 0.07;
 
-            if (Math.abs(mx) > 0.01 || Math.abs(mz) > 0.01) {
+            if (isMoving) {
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 
                 const nextX = player.pos.x + dir.x * speed;
