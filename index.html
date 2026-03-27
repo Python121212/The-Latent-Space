@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Sprint Button</title>
+    <title>The Backrooms - Smooth Movement</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -13,36 +13,24 @@
         .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
         #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
         canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
-        
-        /* 操作ゾーン */
         #move-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 100%; z-index: 200; }
         #look-zone { position: absolute; bottom: 0; right: 0; width: 50%; height: 100%; z-index: 200; }
-        
-        /* ジョイスティック */
         #joystick-container { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; pointer-events: none; }
         #joystick-knob { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; }
-        
-        /* 走るボタン */
         #sprint-btn { 
             position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; 
             background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); 
             border-radius: 50%; color: white; font-family: sans-serif; font-weight: bold;
             display: flex; align-items: center; justify-content: center; 
-            z-index: 300; pointer-events: auto; font-size: 12px;
-            user-select: none; -webkit-tap-highlight-color: transparent;
+            z-index: 300; font-size: 12px; -webkit-tap-highlight-color: transparent;
         }
         #sprint-btn.active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
-
-        #instructions { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; font-size: 10px; opacity: 0.5; z-index: 110; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="instructions">PC: WASD to Move, SHIFT to Sprint / Mobile: Button to Sprint</div>
     <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
-    
-    <div id="move-zone"></div>
-    <div id="look-zone"></div>
+    <div id="move-zone"></div><div id="look-zone"></div>
     <div id="sprint-btn">RUN</div>
     <div id="joystick-container"><div id="joystick-knob"></div></div>
 
@@ -63,14 +51,12 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.7); 
+        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.8); 
         document.body.appendChild(renderer.domElement);
 
         const wallMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
         const floorMat = new THREE.MeshLambertMaterial({ color: 0xc4bc8b });
         const ceilingMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
-        const lampOnColor = new THREE.Color(0xffffff);
-        const lampOffColor = new THREE.Color(0x444433);
         const ambientLight = new THREE.AmbientLight(0xfff5d1, 1.8);
         scene.add(ambientLight); 
 
@@ -84,23 +70,10 @@
         const keys = { w: false, a: false, s: false, d: false, shift: false };
         const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0, joyDist: 0, btnSprint: false };
 
-        // キーボード
-        window.addEventListener('keydown', e => { 
-            const k = e.key.toLowerCase();
-            if(keys.hasOwnProperty(k)) keys[k] = true; 
-            if(e.key === 'Shift') keys.shift = true;
-        });
-        window.addEventListener('keyup', e => { 
-            const k = e.key.toLowerCase();
-            if(keys.hasOwnProperty(k)) keys[k] = false; 
-            if(e.key === 'Shift') keys.shift = false;
-        });
+        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; if(e.key === 'Shift') keys.shift = true; });
+        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; if(e.key === 'Shift') keys.shift = false; });
 
-        // マウス視点
-        document.addEventListener('click', (e) => { 
-            if(e.target.id === 'sprint-btn') return;
-            if(!('ontouchstart' in window)) renderer.domElement.requestPointerLock(); 
-        });
+        document.addEventListener('click', (e) => { if(e.target.id !== 'sprint-btn' && !('ontouchstart' in window)) renderer.domElement.requestPointerLock(); });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
                 player.rot.y -= e.movementX * 0.002;
@@ -108,44 +81,36 @@
             }
         });
 
-        // モバイル操作
-        const moveZone = document.getElementById('move-zone');
-        const lookZone = document.getElementById('look-zone');
         const sprintBtn = document.getElementById('sprint-btn');
         const joyCont = document.getElementById('joystick-container');
         const joyKnob = document.getElementById('joystick-knob');
 
-        // スプリントボタン
-        sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); input.btnSprint = true; sprintBtn.classList.add('active'); });
-        sprintBtn.addEventListener('touchend', () => { input.btnSprint = false; sprintBtn.classList.remove('active'); });
-        // PCクリック用
-        sprintBtn.addEventListener('mousedown', () => { input.btnSprint = true; sprintBtn.classList.add('active'); });
-        sprintBtn.addEventListener('mouseup', () => { input.btnSprint = false; sprintBtn.classList.remove('active'); });
+        const setSprint = (val) => { input.btnSprint = val; val ? sprintBtn.classList.add('active') : sprintBtn.classList.remove('active'); };
+        sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setSprint(true); });
+        sprintBtn.addEventListener('touchend', () => setSprint(false));
+        sprintBtn.addEventListener('mousedown', () => setSprint(true));
+        sprintBtn.addEventListener('mouseup', () => setSprint(false));
 
-        moveZone.addEventListener('touchstart', e => {
+        document.getElementById('move-zone').addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.moveId = t.identifier;
             joyCont.style.display = 'block'; joyCont.style.left = (t.clientX - 50) + 'px'; joyCont.style.top = (t.clientY - 50) + 'px';
         });
-        moveZone.addEventListener('touchmove', e => {
+        document.getElementById('move-zone').addEventListener('touchmove', e => {
             for (let t of e.changedTouches) if (t.identifier === input.moveId) {
                 const r = joyCont.getBoundingClientRect();
-                const dx = t.clientX - (r.left + 50);
-                const dy = t.clientY - (r.top + 50);
+                const dx = t.clientX - (r.left + 50), dy = t.clientY - (r.top + 50);
                 input.joyDist = Math.sqrt(dx*dx + dy*dy);
-                const angle = Math.atan2(dy, dx);
-                const limit = Math.min(input.joyDist, 40);
-                input.moveX = (limit * Math.cos(angle)) / 40;
-                input.moveY = (limit * Math.sin(angle)) / 40;
+                const angle = Math.atan2(dy, dx), limit = Math.min(input.joyDist, 40);
+                input.moveX = (limit * Math.cos(angle)) / 40; input.moveY = (limit * Math.sin(angle)) / 40;
                 joyKnob.style.transform = `translate(${input.moveX * 30}px, ${input.moveY * 30}px)`;
             }
         });
-        moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; joyCont.style.display = 'none'; });
+        document.getElementById('move-zone').addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; joyCont.style.display = 'none'; });
 
-        lookZone.addEventListener('touchstart', e => {
-            if(e.target.id === 'sprint-btn') return;
+        document.getElementById('look-zone').addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
         });
-        lookZone.addEventListener('touchmove', e => {
+        document.getElementById('look-zone').addEventListener('touchmove', e => {
             for (let t of e.changedTouches) if (t.identifier === input.lookId) {
                 player.rot.y -= (t.clientX - input.lastX) * 0.005;
                 player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - input.lastY) * 0.005));
@@ -153,55 +118,39 @@
             }
         });
 
-        // マップ生成
-        function seededRandom(x, z) {
-            const seed = x * 12345 + z * 67890;
-            return (Math.abs(Math.sin(seed) * 10000) % 1);
-        }
+        function seededRandom(x, z) { return (Math.abs(Math.sin(x * 12345 + z * 67890) * 10000) % 1); }
 
         function createTile(tx, tz) {
             const group = new THREE.Group();
             group.add(new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat).rotateX(-Math.PI/2));
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), ceilingMat).rotateX(Math.PI/2);
             ceil.position.y = 3; group.add(ceil);
-
-            const lampRand = seededRandom(tx + 100, tz + 100);
-            let mode = "on";
-            if (lampRand > 0.92) mode = "off";
-            else if (lampRand > 0.82) mode = "flicker";
-
-            const lampMat = new THREE.MeshStandardMaterial({ 
-                color: 0x222222, emissive: (mode === "off") ? lampOffColor : lampOnColor, emissiveIntensity: (mode === "off") ? 0.2 : 2.0
-            });
+            const r = seededRandom(tx + 100, tz + 100);
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: (r>0.92)?0x444433:0xffffff, emissiveIntensity: (r>0.92)?0.2:2.0 });
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
             lamp.position.set(0, 2.98, 0); group.add(lamp);
-            if (mode === "flicker") flickerList.push({ mesh: lamp, offset: lampRand * 20 });
-
+            if (r > 0.82 && r <= 0.92) flickerList.push({ mesh: lamp, offset: r * 20 });
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
-                const configs = [{ p: [0, 1.5, TILE_SIZE/2], s: [TILE_SIZE, 3, 0.4], id: 'N' }, { p: [TILE_SIZE/2, 1.5, 0], s: [0.4, 3, TILE_SIZE], id: 'E' }];
-                configs.forEach(c => {
-                    if (seededRandom(tx + (c.id==='E'?5:0), tz + (c.id==='N'?5:0)) > 0.68) {
-                        const wall = new THREE.Mesh(new THREE.BoxGeometry(...c.s), wallMat);
-                        wall.position.set(...c.p); group.add(wall);
-                        const box = new THREE.Box3().setFromObject(wall).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE));
-                        walls.push(box);
+                [[0, 1.5, 2.5, 5, 3, 0.4], [2.5, 1.5, 0, 0.4, 3, 5]].forEach((c, i) => {
+                    if (seededRandom(tx + (i?5:0), tz + (i?0:5)) > 0.68) {
+                        const wall = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
+                        wall.position.set(c[0], c[1], c[2]); group.add(wall);
+                        walls.push(new THREE.Box3().setFromObject(wall).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
                     }
                 });
             }
             group.position.set(tx * TILE_SIZE, 0, tz * TILE_SIZE);
-            return { mesh: group, walls: walls, mode: mode };
+            return { mesh: group, walls: walls };
         }
 
         function updateMap() {
-            const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE);
-            const pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
+            const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE), pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
             for (let x = px-VIEW_DISTANCE; x <= px+VIEW_DISTANCE; x++) {
                 for (let z = pz-VIEW_DISTANCE; z <= pz+VIEW_DISTANCE; z++) {
                     const key = `${x},${z}`;
-                    if (!mapData.has(key)) {
-                        const t = createTile(x, z); mapData.set(key, t); scene.add(t.mesh);
-                    } else { scene.add(mapData.get(key).mesh); }
+                    if (!mapData.has(key)) { const t = createTile(x, z); mapData.set(key, t); scene.add(t.mesh); }
+                    else { scene.add(mapData.get(key).mesh); }
                 }
             }
             mapData.forEach((t, k) => {
@@ -213,54 +162,41 @@
             });
         }
 
+        function checkCollision(box) {
+            for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (box.intersectsBox(w)) return true;
+            return false;
+        }
+
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
+            flickerList.forEach(l => l.mesh.material.emissiveIntensity = ((Math.sin(time * 50 + l.offset) * Math.cos(time * 15)) > -0.2) ? 2.0 : 0.2);
+
+            let mx = input.moveX, mz = input.moveY;
+            if (keys.w) mz = -1; if (keys.s) mz = 1; if (keys.a) mx = -1; if (keys.d) mx = 1;
             
-            const px = Math.floor((player.pos.x + TILE_SIZE/2) / TILE_SIZE);
-            const pz = Math.floor((player.pos.z + TILE_SIZE/2) / TILE_SIZE);
-            const currentTile = mapData.get(`${px},${pz}`);
-            let currentTileLightOn = true;
-            
-            flickerList.forEach(lamp => {
-                const on = (Math.sin(time * 50 + lamp.offset) * Math.cos(time * 15)) > -0.2;
-                lamp.mesh.material.emissiveIntensity = on ? 2.0 : 0.2;
-                if (lamp.mesh.parent === currentTile?.mesh) currentTileLightOn = on;
-            });
-
-            let targetIntensity = 1.8;
-            if (currentTile?.mode === "off") targetIntensity = 0.7;
-            else if (currentTile?.mode === "flicker") targetIntensity = currentTileLightOn ? 1.8 : 0.7;
-            ambientLight.intensity += (targetIntensity - ambientLight.intensity) * 0.15;
-
-            // 移動計算
-            let moveX = input.moveX;
-            let moveZ = input.moveY;
-            if (keys.w) moveZ = -1; if (keys.s) moveZ = 1;
-            if (keys.a) moveX = -1; if (keys.d) moveX = 1;
-
-            // スプリント判定
             player.isSprinting = keys.shift || input.btnSprint || input.joyDist > 55;
             const speed = player.isSprinting ? 0.14 : 0.07;
-            const bobFreq = player.isSprinting ? 18 : 12;
-            const bobAmp = player.isSprinting ? 0.06 : 0.025;
 
-            if (Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01) {
-                const d = new THREE.Vector3(moveX, 0, moveZ).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                const pBox = new THREE.Box3(new THREE.Vector3(player.pos.x+d.x*speed-0.3, 0.1, player.pos.z+d.z*speed-0.3), new THREE.Vector3(player.pos.x+d.x*speed+0.3, 2.5, player.pos.z+d.z*speed+0.3));
-                let collide = false;
-                for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (pBox.intersectsBox(w)) collide = true;
-                if (!collide) { player.pos.x += d.x*speed; player.pos.z += d.z*speed; }
+            if (Math.abs(mx) > 0.01 || Math.abs(mz) > 0.01) {
+                const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 
-                player.pos.y = 1.6 + Math.sin(time * bobFreq) * bobAmp;
-                player.sway.z = Math.sin(time * (bobFreq/2)) * (player.isSprinting ? 0.04 : 0.01);
-            } else { 
-                player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; 
-                player.sway.z *= 0.9;
-            }
+                // X方向の移動を個別に計算
+                const nextX = player.pos.x + dir.x * speed;
+                const boxX = new THREE.Box3(new THREE.Vector3(nextX-0.3, 0.1, player.pos.z-0.3), new THREE.Vector3(nextX+0.3, 2.5, player.pos.z+0.3));
+                if (!checkCollision(boxX)) player.pos.x = nextX;
 
-            player.sway.x = Math.sin(time * 1.5) * 0.005;
-            player.sway.y = Math.cos(time * 1.2) * 0.005;
+                // Z方向の移動を個別に計算
+                const nextZ = player.pos.z + dir.z * speed;
+                const boxZ = new THREE.Box3(new THREE.Vector3(player.pos.x-0.3, 0.1, nextZ-0.3), new THREE.Vector3(player.pos.x+0.3, 2.5, nextZ+0.3));
+                if (!checkCollision(boxZ)) player.pos.z = nextZ;
+
+                const bob = player.isSprinting ? 18 : 12;
+                player.pos.y = 1.6 + Math.sin(time * bob) * (player.isSprinting ? 0.06 : 0.025);
+                player.sway.z = Math.sin(time * (bob/2)) * (player.isSprinting ? 0.04 : 0.01);
+            } else { player.pos.y = 1.6 + Math.sin(time * 2) * 0.008; player.sway.z *= 0.9; }
+
+            player.sway.x = Math.sin(time * 1.5) * 0.005; player.sway.y = Math.cos(time * 1.2) * 0.005;
             camera.position.copy(player.pos);
             camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, player.sway.z, 'YXZ'));
             
@@ -268,10 +204,7 @@
             renderer.render(scene, camera);
         }
         animate();
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
