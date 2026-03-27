@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Sprint Update</title>
+    <title>The Backrooms - Sprint Button</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -13,18 +13,37 @@
         .vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 150%); z-index: 106; }
         #ui { position: absolute; bottom: 20px; left: 20px; color: #eee; font-family: 'Courier New', Courier, monospace; font-size: 12px; text-shadow: 1px 1px #000; z-index: 110; opacity: 0.8; pointer-events: none; }
         canvas { filter: contrast(1.1) saturate(1.1) blur(0.3px); cursor: crosshair; }
-        #move-zone, #look-zone { position: absolute; bottom: 0; width: 50%; height: 100%; z-index: 200; }
-        #look-zone { right: 0; }
+        
+        /* 操作ゾーン */
+        #move-zone { position: absolute; bottom: 0; left: 0; width: 50%; height: 100%; z-index: 200; }
+        #look-zone { position: absolute; bottom: 0; right: 0; width: 50%; height: 100%; z-index: 200; }
+        
+        /* ジョイスティック */
         #joystick-container { position: absolute; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 210; pointer-events: none; }
         #joystick-knob { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 50%; }
+        
+        /* 走るボタン */
+        #sprint-btn { 
+            position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; 
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); 
+            border-radius: 50%; color: white; font-family: sans-serif; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; 
+            z-index: 300; pointer-events: auto; font-size: 12px;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        #sprint-btn.active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
+
         #instructions { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; font-size: 10px; opacity: 0.5; z-index: 110; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="instructions">PC: WASD to Move, SHIFT to Sprint / Mobile: Drag Joy further to Sprint</div>
+    <div id="instructions">PC: WASD to Move, SHIFT to Sprint / Mobile: Button to Sprint</div>
     <div id="ui">[REC]  ▶<br>ASYNC RESEARCH<br>JUL. 04 1991</div>
     <div id="vhs-container"><div class="scanlines"></div><div class="noise"></div><div class="vignette"></div></div>
-    <div id="move-zone"></div><div id="look-zone"></div>
+    
+    <div id="move-zone"></div>
+    <div id="look-zone"></div>
+    <div id="sprint-btn">RUN</div>
     <div id="joystick-container"><div id="joystick-knob"></div></div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
@@ -63,8 +82,9 @@
         };
 
         const keys = { w: false, a: false, s: false, d: false, shift: false };
-        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0, joyDist: 0 };
+        const input = { moveX: 0, moveY: 0, lookId: null, moveId: null, lastX: 0, lastY: 0, joyDist: 0, btnSprint: false };
 
+        // キーボード
         window.addEventListener('keydown', e => { 
             const k = e.key.toLowerCase();
             if(keys.hasOwnProperty(k)) keys[k] = true; 
@@ -76,7 +96,11 @@
             if(e.key === 'Shift') keys.shift = false;
         });
 
-        document.addEventListener('click', () => { if(!('ontouchstart' in window)) renderer.domElement.requestPointerLock(); });
+        // マウス視点
+        document.addEventListener('click', (e) => { 
+            if(e.target.id === 'sprint-btn') return;
+            if(!('ontouchstart' in window)) renderer.domElement.requestPointerLock(); 
+        });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
                 player.rot.y -= e.movementX * 0.002;
@@ -84,10 +108,19 @@
             }
         });
 
+        // モバイル操作
         const moveZone = document.getElementById('move-zone');
         const lookZone = document.getElementById('look-zone');
+        const sprintBtn = document.getElementById('sprint-btn');
         const joyCont = document.getElementById('joystick-container');
         const joyKnob = document.getElementById('joystick-knob');
+
+        // スプリントボタン
+        sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); input.btnSprint = true; sprintBtn.classList.add('active'); });
+        sprintBtn.addEventListener('touchend', () => { input.btnSprint = false; sprintBtn.classList.remove('active'); });
+        // PCクリック用
+        sprintBtn.addEventListener('mousedown', () => { input.btnSprint = true; sprintBtn.classList.add('active'); });
+        sprintBtn.addEventListener('mouseup', () => { input.btnSprint = false; sprintBtn.classList.remove('active'); });
 
         moveZone.addEventListener('touchstart', e => {
             const t = e.changedTouches[0]; input.moveId = t.identifier;
@@ -101,7 +134,6 @@
                 input.joyDist = Math.sqrt(dx*dx + dy*dy);
                 const angle = Math.atan2(dy, dx);
                 const limit = Math.min(input.joyDist, 40);
-                
                 input.moveX = (limit * Math.cos(angle)) / 40;
                 input.moveY = (limit * Math.sin(angle)) / 40;
                 joyKnob.style.transform = `translate(${input.moveX * 30}px, ${input.moveY * 30}px)`;
@@ -110,6 +142,7 @@
         moveZone.addEventListener('touchend', () => { input.moveId = null; input.moveX = input.moveY = 0; input.joyDist = 0; joyCont.style.display = 'none'; });
 
         lookZone.addEventListener('touchstart', e => {
+            if(e.target.id === 'sprint-btn') return;
             const t = e.changedTouches[0]; input.lookId = t.identifier; input.lastX = t.clientX; input.lastY = t.clientY;
         });
         lookZone.addEventListener('touchmove', e => {
@@ -120,6 +153,7 @@
             }
         });
 
+        // マップ生成
         function seededRandom(x, z) {
             const seed = x * 12345 + z * 67890;
             return (Math.abs(Math.sin(seed) * 10000) % 1);
@@ -137,13 +171,10 @@
             else if (lampRand > 0.82) mode = "flicker";
 
             const lampMat = new THREE.MeshStandardMaterial({ 
-                color: 0x222222, 
-                emissive: (mode === "off") ? lampOffColor : lampOnColor,
-                emissiveIntensity: (mode === "off") ? 0.2 : 2.0
+                color: 0x222222, emissive: (mode === "off") ? lampOffColor : lampOnColor, emissiveIntensity: (mode === "off") ? 0.2 : 2.0
             });
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
-            lamp.position.set(0, 2.98, 0);
-            group.add(lamp);
+            lamp.position.set(0, 2.98, 0); group.add(lamp);
             if (mode === "flicker") flickerList.push({ mesh: lamp, offset: lampRand * 20 });
 
             const walls = [];
@@ -202,17 +233,17 @@
             else if (currentTile?.mode === "flicker") targetIntensity = currentTileLightOn ? 1.8 : 0.7;
             ambientLight.intensity += (targetIntensity - ambientLight.intensity) * 0.15;
 
-            // --- 移動とダッシュのロジック ---
+            // 移動計算
             let moveX = input.moveX;
             let moveZ = input.moveY;
             if (keys.w) moveZ = -1; if (keys.s) moveZ = 1;
             if (keys.a) moveX = -1; if (keys.d) moveX = 1;
 
-            // ダッシュ判定 (PC: Shift, Mobile: ジョイスティックを大きく倒す)
-            player.isSprinting = keys.shift || input.joyDist > 55;
-            const speed = player.isSprinting ? 0.13 : 0.07;
+            // スプリント判定
+            player.isSprinting = keys.shift || input.btnSprint || input.joyDist > 55;
+            const speed = player.isSprinting ? 0.14 : 0.07;
             const bobFreq = player.isSprinting ? 18 : 12;
-            const bobAmp = player.isSprinting ? 0.05 : 0.025;
+            const bobAmp = player.isSprinting ? 0.06 : 0.025;
 
             if (Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01) {
                 const d = new THREE.Vector3(moveX, 0, moveZ).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
@@ -221,7 +252,6 @@
                 for (let t of mapData.values()) if (t.mesh.parent === scene) for (let w of t.walls) if (pBox.intersectsBox(w)) collide = true;
                 if (!collide) { player.pos.x += d.x*speed; player.pos.z += d.z*speed; }
                 
-                // 歩行/走行の揺れ
                 player.pos.y = 1.6 + Math.sin(time * bobFreq) * bobAmp;
                 player.sway.z = Math.sin(time * (bobFreq/2)) * (player.isSprinting ? 0.04 : 0.01);
             } else { 
@@ -232,7 +262,6 @@
             player.sway.x = Math.sin(time * 1.5) * 0.005;
             player.sway.y = Math.cos(time * 1.2) * 0.005;
             camera.position.copy(player.pos);
-            // 走っている時は少しだけ前傾姿勢にするなどの微調整
             camera.quaternion.setFromEuler(new THREE.Euler(player.rot.x + player.sway.x, player.rot.y + player.sway.y, player.sway.z, 'YXZ'));
             
             updateMap();
