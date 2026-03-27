@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Smooth Movement</title>
+    <title>The Backrooms - Optimized Light</title>
     <style>
         body { margin: 0; overflow: hidden; background: #bdb58d; touch-action: none; -webkit-user-select: none; }
         #vhs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 100; }
@@ -45,7 +45,7 @@
         const flickerList = [];
         const scene = new THREE.Scene();
         const fogColor = 0x9e956b;
-        scene.fog = new THREE.Fog(fogColor, 2, 25);
+        scene.fog = new THREE.Fog(fogColor, 1, 25);
         scene.background = new THREE.Color(fogColor);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
@@ -54,11 +54,13 @@
         renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 0.8); 
         document.body.appendChild(renderer.domElement);
 
+        // ライトを1つに集約（明るさは高めに設定）
+        const ambientLight = new THREE.AmbientLight(0xfff5d1, 2.2);
+        scene.add(ambientLight); 
+
         const wallMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
         const floorMat = new THREE.MeshLambertMaterial({ color: 0xc4bc8b });
         const ceilingMat = new THREE.MeshLambertMaterial({ color: 0xd6cc91 });
-        const ambientLight = new THREE.AmbientLight(0xfff5d1, 1.8);
-        scene.add(ambientLight); 
 
         const player = { 
             pos: new THREE.Vector3(0, 1.6, 0), 
@@ -84,8 +86,8 @@
         const sprintBtn = document.getElementById('sprint-btn');
         const joyCont = document.getElementById('joystick-container');
         const joyKnob = document.getElementById('joystick-knob');
-
         const setSprint = (val) => { input.btnSprint = val; val ? sprintBtn.classList.add('active') : sprintBtn.classList.remove('active'); };
+        
         sprintBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setSprint(true); });
         sprintBtn.addEventListener('touchend', () => setSprint(false));
         sprintBtn.addEventListener('mousedown', () => setSprint(true));
@@ -125,11 +127,19 @@
             group.add(new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat).rotateX(-Math.PI/2));
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), ceilingMat).rotateX(Math.PI/2);
             ceil.position.y = 3; group.add(ceil);
+            
             const r = seededRandom(tx + 100, tz + 100);
-            const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: (r>0.92)?0x444433:0xffffff, emissiveIntensity: (r>0.92)?0.2:2.0 });
+            // 物理的なライト（PointLight）は作らず、マテリアルの発光のみ設定
+            const lampMat = new THREE.MeshStandardMaterial({ 
+                color: 0x222222, 
+                emissive: (r > 0.95) ? 0x222211 : 0xffffff, 
+                emissiveIntensity: (r > 0.95) ? 0.2 : 2.5 
+            });
             const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 0.6), lampMat);
             lamp.position.set(0, 2.98, 0); group.add(lamp);
-            if (r > 0.82 && r <= 0.92) flickerList.push({ mesh: lamp, offset: r * 20 });
+            
+            if (r > 0.85 && r <= 0.95) flickerList.push({ mesh: lamp, offset: r * 20 });
+            
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
                 [[0, 1.5, 2.5, 5, 3, 0.4], [2.5, 1.5, 0, 0.4, 3, 5]].forEach((c, i) => {
@@ -170,23 +180,20 @@
         function animate() {
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
-            flickerList.forEach(l => l.mesh.material.emissiveIntensity = ((Math.sin(time * 50 + l.offset) * Math.cos(time * 15)) > -0.2) ? 2.0 : 0.2);
+            flickerList.forEach(l => l.mesh.material.emissiveIntensity = ((Math.sin(time * 50 + l.offset) * Math.cos(time * 15)) > -0.2) ? 2.5 : 0.2);
 
             let mx = input.moveX, mz = input.moveY;
             if (keys.w) mz = -1; if (keys.s) mz = 1; if (keys.a) mx = -1; if (keys.d) mx = 1;
-            
             player.isSprinting = keys.shift || input.btnSprint || input.joyDist > 55;
             const speed = player.isSprinting ? 0.14 : 0.07;
 
             if (Math.abs(mx) > 0.01 || Math.abs(mz) > 0.01) {
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 
-                // X方向の移動を個別に計算
                 const nextX = player.pos.x + dir.x * speed;
                 const boxX = new THREE.Box3(new THREE.Vector3(nextX-0.3, 0.1, player.pos.z-0.3), new THREE.Vector3(nextX+0.3, 2.5, player.pos.z+0.3));
                 if (!checkCollision(boxX)) player.pos.x = nextX;
 
-                // Z方向の移動を個別に計算
                 const nextZ = player.pos.z + dir.z * speed;
                 const boxZ = new THREE.Box3(new THREE.Vector3(player.pos.x-0.3, 0.1, nextZ-0.3), new THREE.Vector3(player.pos.x+0.3, 2.5, nextZ+0.3));
                 if (!checkCollision(boxZ)) player.pos.z = nextZ;
