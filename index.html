@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Fixed Footsteps</title>
+    <title>The Backrooms - Stereo Audio Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; }
@@ -60,9 +60,11 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // オーディオ設定
+        // --- オーディオ設定 (ステレオ固定) ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
+
+        // Position無しの通常Audioクラスを使用することでステレオ再生にする
         const humSound = new THREE.Audio(listener);
         const footstepSound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
@@ -75,7 +77,7 @@
 
         audioLoader.load('footstep.mp3', (buffer) => {
             footstepSound.setBuffer(buffer);
-            footstepSound.setVolume(0.5);
+            footstepSound.setVolume(0.6);
         });
 
         window.startApp = () => {
@@ -101,7 +103,6 @@
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a724d, roughness: 0.9 });
         const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
 
-        // 入力設定
         const setupBtn = (id, key, cb) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', e => { e.preventDefault(); keys[key]=true; if(cb)cb(); }, {passive:false});
@@ -115,7 +116,6 @@
         document.addEventListener('pointerlockchange', () => { document.getElementById('lock-overlay').style.display = (document.pointerLockElement === renderer.domElement) ? 'none' : 'flex'; });
         document.addEventListener('mousemove', (e) => { if (document.pointerLockElement === renderer.domElement) { player.rot.y -= e.movementX * 0.002; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002)); } });
 
-        // ジョイスティック
         let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jStick = document.getElementById('joystick-stick'), jBase = document.getElementById('joystick-base');
         renderer.domElement.addEventListener('touchstart', e => { for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
@@ -133,7 +133,6 @@
         }, { passive: false });
         window.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === lookId) lookId = null; if(t.identifier === jTouchId) { jActive = false; jInput = {x:0,z:0}; jStick.style.transform = ''; } } });
 
-        // マップ生成
         const mapData = new Map();
         function createTile(tx, tz) {
             const group = new THREE.Group();
@@ -163,11 +162,9 @@
             const deltaTime = clock.getDelta();
             const elapsedTime = clock.getElapsedTime();
 
-            // 垂直移動
             player.pos.y += player.velY;
             if (player.pos.y > 0) { player.velY -= 0.007; player.isGrounded = false; } else { player.pos.y = 0; player.velY = 0; player.isGrounded = true; }
 
-            // 水平移動入力判定 (0.1以上の入力があったときのみ移動)
             const inputX = (keys['d']?1:0) - (keys['a']?1:0) + jInput.x;
             const inputZ = (keys['s']?1:0) - (keys['w']?1:0) + jInput.z;
             const isInputActive = Math.sqrt(inputX*inputX + inputZ*inputZ) > 0.2;
@@ -194,12 +191,11 @@
                 
                 player.bobTimer += player.currentSpeed * 4;
 
-                // --- 足音ロジックの修正 ---
-                // 移動速度に応じた適切な間隔（歩行: 0.5s, 走行: 0.35s 程度）
                 const stepInterval = keys['shift'] ? 0.35 : 0.52;
                 if (elapsedTime - player.lastStepTime > stepInterval && player.isGrounded) {
                     if (footstepSound.buffer) {
-                        if (footstepSound.isPlaying) footstepSound.stop(); // 重なり防止
+                        // ステレオ再生のために再生ごとにstop/start
+                        if (footstepSound.isPlaying) footstepSound.stop();
                         footstepSound.setPlaybackRate(keys['shift'] ? 1.1 : 1.0);
                         footstepSound.play();
                     }
