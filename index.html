@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lighting Fix</title>
+    <title>The Backrooms - Audio Added</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; }
@@ -24,9 +24,11 @@
     </style>
 </head>
 <body>
-    <div id="lock-overlay" onclick="renderer.domElement.requestPointerLock()">
-        <div style="text-align:center"><h1>THE BACKROOMS</h1><p>TOUCH TO START</p></div>
+    <!-- 音声再生のためにクリックが必要なオーバーレイ -->
+    <div id="lock-overlay" onclick="startApp()">
+        <div style="text-align:center"><h1>THE BACKROOMS</h1><p>TOUCH TO START & PLAY AUDIO</p></div>
     </div>
+    
     <div id="stats">LVL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
     <div id="mobile-ui">
         <div class="joy-container"><div id="joystick-base"><div id="joystick-stick"></div></div></div>
@@ -46,11 +48,9 @@
         scene.background = new THREE.Color(0x1a1a0d);
         scene.fog = new THREE.Fog(0x1a1a0d, 2, 12);
 
-        // 環境光（全体を黄色く）
         const ambientLight = new THREE.AmbientLight(0xfffaaa, 0.4);
         scene.add(ambientLight);
 
-        // プレイヤーの持つ光源（不気味な揺れ用）
         const playerLight = new THREE.PointLight(0xfff0aa, 1.5, 8);
         scene.add(playerLight);
 
@@ -62,6 +62,27 @@
         document.body.appendChild(renderer.domElement);
         window.renderer = renderer;
 
+        // --- オーディオ設定 ---
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        const humSound = new THREE.Audio(listener);
+        const audioLoader = new THREE.AudioLoader();
+        
+        // ファイル読み込み（hum.mp3が同じ階層にある想定）
+        audioLoader.load('hum.mp3', (buffer) => {
+            humSound.setBuffer(buffer);
+            humSound.setLoop(true);
+            humSound.setVolume(0.5);
+        });
+
+        // スタートボタン（クリックでロック＋音声再生開始）
+        window.startApp = () => {
+            renderer.domElement.requestPointerLock();
+            if (humSound.buffer && !humSound.isPlaying) {
+                humSound.play();
+            }
+        };
+
         const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100, currentSpeed: 0, bobTimer: 0, velY: 0, isGrounded: true, lean: 0 };
         const keys = {};
 
@@ -69,7 +90,7 @@
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a724d, roughness: 0.9 });
         const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
 
-        // 入力処理（前回のロジック維持）
+        // 入力系（Q/E, ジャンプ等）
         const setupBtn = (id, key, cb) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', e => { e.preventDefault(); keys[key]=true; if(cb)cb(); }, {passive:false});
@@ -83,7 +104,7 @@
         document.addEventListener('pointerlockchange', () => { document.getElementById('lock-overlay').style.display = (document.pointerLockElement === renderer.domElement) ? 'none' : 'flex'; });
         document.addEventListener('mousemove', (e) => { if (document.pointerLockElement === renderer.domElement) { player.rot.y -= e.movementX * 0.002; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002)); } });
 
-        // スマホ視点/スティック（前回のロジック維持）
+        // モバイル操作
         let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jStick = document.getElementById('joystick-stick'), jBase = document.getElementById('joystick-base');
         renderer.domElement.addEventListener('touchstart', e => { for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
@@ -101,7 +122,7 @@
         }, { passive: false });
         window.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === lookId) lookId = null; if(t.identifier === jTouchId) { jActive = false; jInput = {x:0,z:0}; jStick.style.transform = ''; } } });
 
-        // タイル生成（蛍光灯を追加）
+        // 生成
         const mapData = new Map();
         function createTile(tx, tz) {
             const group = new THREE.Group();
@@ -110,7 +131,6 @@
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(5.05, 5.05), wallMat);
             ceil.rotation.x = Math.PI/2; ceil.position.y = 3; group.add(ceil);
 
-            // --- 蛍光灯の追加 ---
             const lampFrame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.4), new THREE.MeshStandardMaterial({color:0x333333}));
             lampFrame.position.set(0, 2.96, 0); group.add(lampFrame);
             const lampLight = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.05, 0.3), lightMat);
@@ -164,7 +184,6 @@
             camera.position.add(new THREE.Vector3(player.lean * 0.6, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0)));
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.15);
 
-            // プレイヤー光源を更新（わずかに揺らす）
             playerLight.position.set(player.pos.x, 2.2, player.pos.z);
             playerLight.intensity = 1.5 + Math.sin(Date.now()*0.01)*0.1;
 
@@ -172,7 +191,6 @@
             for (let x = curTX - 5; x <= curTX + 5; x++) for (let z = curTZ - 5; z <= curTZ + 5; z++) {
                 if (!mapData.has(`${x},${z}`)) mapData.set(`${x},${z}`, createTile(x, z));
             }
-
             renderer.render(scene, camera);
         }
         animate();
