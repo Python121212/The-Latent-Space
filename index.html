@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Smooth Movement Fix</title>
+    <title>The Backrooms - Anti-Jitter Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
@@ -44,8 +44,10 @@
             pos: new THREE.Vector3(0, 0, 0),
             rot: { x: 0, y: 0 },
             stamina: 100,
+            isExhausted: false, // 息切れ状態フラグ
             lean: 0,
-            bobTimer: 0
+            bobTimer: 0,
+            currentSpeed: 0.07 // 現在の速度（補間用）
         };
         const keys = {};
 
@@ -65,7 +67,6 @@
             const group = new THREE.Group();
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
             floor.rotation.x = -Math.PI/2; group.add(floor);
-            
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
             ceil.rotation.x = Math.PI/2; ceil.position.y = 3; group.add(ceil);
 
@@ -105,21 +106,25 @@
             let mz = (keys['s']?1:0) - (keys['w']?1:0);
             const isInputMoving = mx !== 0 || mz !== 0;
 
-            // スタミナが0より大きければ走れる
-            const isSprintKey = keys['shift'];
-            const isSprinting = isSprintKey && player.stamina > 0 && isInputMoving;
-            
-            // スタミナ消費・回復
-            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -0.8 : 0.5)));
-            document.getElementById('stamina-fill').style.width = player.stamina + '%';
+            // --- スタミナ管理の改善 ---
+            if (player.stamina <= 0) player.isExhausted = true;
+            if (player.stamina >= 20) player.isExhausted = false; // 20%まで回復したら息切れ解除
 
-            if (isInputMoving) {
-                // スタミナ切れの瞬間ガタつかないよう、移動速度を決定
-                const speed = isSprinting ? 0.13 : 0.07;
+            const isSprintKey = keys['shift'];
+            const isSprinting = isSprintKey && !player.isExhausted && isInputMoving;
+            
+            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -1.0 : 0.6)));
+            document.getElementById('stamina-fill').style.width = player.stamina + '%';
+            document.getElementById('stamina-fill').style.background = player.isExhausted ? '#f55' : '#eee';
+
+            // --- 速度の滑らかな補間（ガクつき防止の核心） ---
+            const targetSpeed = isInputMoving ? (isSprinting ? 0.13 : 0.07) : 0;
+            player.currentSpeed += (targetSpeed - player.currentSpeed) * 0.15;
+
+            if (player.currentSpeed > 0.001) {
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                
                 ['x', 'z'].forEach(axis => {
-                    const next = player.pos[axis] + dir[axis] * speed;
+                    const next = player.pos[axis] + dir[axis] * player.currentSpeed;
                     const testBox = new THREE.Box3().setFromCenterAndSize(
                         player.pos.clone().setComponent(axis==='x'?0:2, next).add(new THREE.Vector3(0,1,0)), 
                         new THREE.Vector3(0.6, 1.8, 0.6)
@@ -133,28 +138,23 @@
                     if(!hit) player.pos[axis] = next;
                 });
 
-                // ボブタイマーの進み具合もスタミナに依存させる
-                player.bobTimer += isSprinting ? 0.22 : 0.14;
+                // 揺れのタイマーも速度に比例させる
+                player.bobTimer += player.currentSpeed * 2.2;
             } else {
-                // 止まっているときはボブタイマーをゆっくりリセット
                 player.bobTimer *= 0.85;
             }
 
-            // リーン計算（スムーズな移行）
+            // リーン
             const targetLean = (keys['e'] ? 1 : 0) - (keys['q'] ? 1 : 0);
             player.lean += (targetLean - player.lean) * 0.12;
 
-            // カメラ位置計算
-            const eyeHeight = 1.5;
-            const bobY = Math.sin(player.bobTimer) * (isSprinting ? 0.06 : 0.03);
-            const bobZ = Math.cos(player.bobTimer) * (isSprinting ? 0.04 : 0.02);
-
+            // カメラ位置（目線の高さ 1.5m）
+            const bobY = Math.sin(player.bobTimer) * (player.currentSpeed * 0.4);
+            const bobZ = Math.cos(player.bobTimer) * (player.currentSpeed * 0.25);
             const leanOffset = new THREE.Vector3(player.lean * 0.75, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
 
-            camera.position.set(player.pos.x, player.pos.y + eyeHeight + bobY, player.pos.z);
+            camera.position.set(player.pos.x, player.pos.y + 1.5 + bobY, player.pos.z);
             camera.position.add(leanOffset);
-
-            // 回転（視点回転 + リーン + ボブ）
             camera.rotation.set(player.rot.x, player.rot.y, (-player.lean * 0.22) + bobZ);
             
             updateMap();
