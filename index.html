@@ -3,47 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Multi-Touch Fix</title>
+    <title>The Backrooms - UI Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background: #050500; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; image-rendering: pixelated; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; z-index: 10; }
-        #stamina-bar { width: 120px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #444; margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #eee; transition: width 0.1s; }
         
-        /* 操作パネル */
-        #joystick-base { position: absolute; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); z-index: 20; }
+        /* メインUI */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        #stats { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; }
+        #stamina-bar { width: 120px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #444; margin-top: 5px; }
+        #stamina-fill { width: 100%; height: 100%; background: #eee; }
+        
+        /* スタートメッセージ */
+        #lock-msg { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            color: rgba(255,255,255,0.8); text-align: center; font-size: 14px;
+            background: rgba(0,0,0,0.4); padding: 20px; border-radius: 10px;
+            pointer-events: none; transition: opacity 0.3s;
+        }
+
+        /* 操作ボタン */
+        #controls-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
+        #joystick-base { position: absolute; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); pointer-events: auto; }
         #joystick-stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; pointer-events: none; }
         
-        .action-btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-end; z-index: 20; }
+        .action-btns { position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 12px; align-items: flex-end; pointer-events: auto; }
         .lean-row { display: flex; gap: 10px; }
-        .btn { width: 60px; height: 60px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 14px; -webkit-tap-highlight-color: transparent; }
-        .btn:active { background: rgba(255,255,255,0.4); border-color: #fff; }
-        #btn-shift { width: 90px; height: 60px; border-radius: 12px; background: rgba(255,255,255,0.08); font-size: 12px; }
-        #btn-jump { width: 70px; height: 70px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); }
-
-        #lock-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.4); pointer-events: none; text-align: center; }
+        .btn { width: 60px; height: 60px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+        .btn:active { background: rgba(255,255,255,0.4); }
+        #btn-shift { width: 90px; height: 60px; border-radius: 12px; }
     </style>
 </head>
 <body>
-    <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="lock-msg">Click to Start (PC)<br>Swipe Right Side to Look (Mobile)</div>
-    
-    <div id="joystick-base"><div id="joystick-stick"></div></div>
-    <div class="action-btns">
-        <div id="btn-jump" class="btn">JUMP</div>
-        <div class="lean-row">
-            <div id="btn-q" class="btn">Q</div>
-            <div id="btn-e" class="btn">E</div>
+    <div id="ui-layer">
+        <div id="stats">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
+        <div id="lock-msg">CLICK TO START<br><small>(ESC to Unlock / Swipe to Look)</small></div>
+    </div>
+
+    <div id="controls-layer">
+        <div id="joystick-base"><div id="joystick-stick"></div></div>
+        <div class="action-btns">
+            <div id="btn-jump" class="btn">JUMP</div>
+            <div class="lean-row">
+                <div id="btn-q" class="btn">Q</div>
+                <div id="btn-e" class="btn">E</div>
+            </div>
+            <div id="btn-shift" class="btn">RUN</div>
         </div>
-        <div id="btn-shift" class="btn">RUN</div>
     </div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
         import * as THREE from 'three';
 
-        const TILE_SIZE = 5;
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050500);
         scene.fog = new THREE.Fog(0x050500, 1, 14);
@@ -67,14 +79,32 @@
         };
         const keys = {};
 
-        // --- 入力システム ---
-        // PC
+        // --- メッセージ消去システム ---
+        const msgEl = document.getElementById('lock-msg');
+        function hideMsg() { msgEl.style.opacity = '0'; setTimeout(() => msgEl.style.display = 'none', 300); }
+        function showMsg() { msgEl.style.display = 'block'; setTimeout(() => msgEl.style.opacity = '1', 10); }
+
+        // PCポインターロック
+        document.addEventListener('mousedown', () => {
+            if(document.pointerLockElement !== renderer.domElement) {
+                renderer.domElement.requestPointerLock();
+            }
+        });
+        document.addEventListener('pointerlockchange', () => {
+            if(document.pointerLockElement === renderer.domElement) hideMsg();
+            else showMsg();
+        });
+
+        // モバイル：画面のどこかに触れたら消す
+        window.addEventListener('touchstart', hideMsg, { once: true });
+
+        // --- 入力処理 ---
         window.addEventListener('keydown', e => { 
             keys[e.key.toLowerCase()] = true; 
             if(e.code === 'Space') jump(); 
         });
         window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-        document.addEventListener('mousedown', () => { if(document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+        
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
                 player.rot.y -= e.movementX * 0.002;
@@ -82,90 +112,58 @@
             }
         });
 
-        // モバイルボタン (マルチタッチ対応)
+        // モバイルボタン
         const setupBtn = (id, key, callback) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', e => {
-                e.preventDefault();
-                keys[key] = true;
-                if(callback) callback();
-            }, { passive: false });
-            el.addEventListener('touchend', e => {
-                e.preventDefault();
-                keys[key] = false;
-            }, { passive: false });
+            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; if(callback) callback(); }, { passive: false });
+            el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; }, { passive: false });
         };
-        setupBtn('btn-q', 'q');
-        setupBtn('btn-e', 'e');
-        setupBtn('btn-shift', 'shift');
-        setupBtn('btn-jump', 'space', jump);
+        setupBtn('btn-q', 'q'); setupBtn('btn-e', 'e'); setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', 'space', jump);
 
-        // ジョイスティック
+        // スティック & 視点
         let jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jBase = document.getElementById('joystick-base'), jStick = document.getElementById('joystick-stick');
         
         jBase.addEventListener('touchstart', e => {
-            e.preventDefault();
-            jActive = true;
-            jTouchId = e.changedTouches[0].identifier;
+            e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier;
             updateJoystick(e.changedTouches[0]);
         }, { passive: false });
 
         window.addEventListener('touchmove', e => {
             for(let t of e.changedTouches) {
-                if(jActive && t.identifier === jTouchId) {
-                    updateJoystick(t);
-                    e.preventDefault();
-                }
-            }
-        }, { passive: false });
-
-        window.addEventListener('touchend', e => {
-            for(let t of e.changedTouches) {
-                if(t.identifier === jTouchId) {
-                    jActive = false; jTouchId = null;
-                    jStick.style.transform = ''; jInput = {x:0, z:0};
-                }
-            }
-        });
-
-        function updateJoystick(touch) {
-            const r = jBase.getBoundingClientRect();
-            const dx = touch.clientX - (r.left + 50), dy = touch.clientY - (r.top + 50);
-            const d = Math.min(50, Math.sqrt(dx*dx + dy*dy));
-            const a = Math.atan2(dy, dx);
-            jStick.style.transform = `translate(${Math.cos(a)*d}px, ${Math.sin(a)*d}px)`;
-            jInput.x = (Math.cos(a)*d)/50; jInput.z = (Math.sin(a)*d)/50;
-        }
-
-        // 視点移動 (右側スワイプ)
-        let lookTouchId = null, lX, lY;
-        renderer.domElement.addEventListener('touchstart', e => {
-            for(let t of e.changedTouches) {
-                if(t.pageX > window.innerWidth / 2 && lookTouchId === null) {
-                    lookTouchId = t.identifier;
-                    lX = t.pageX; lY = t.pageY;
-                }
-            }
-        });
-        window.addEventListener('touchmove', e => {
-            for(let t of e.changedTouches) {
-                if(t.identifier === lookTouchId) {
+                if(jActive && t.identifier === jTouchId) { updateJoystick(t); e.preventDefault(); }
+                if(t.identifier === lookId) {
                     player.rot.y -= (t.pageX - lX) * 0.006;
                     player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.pageY - lY) * 0.006));
                     lX = t.pageX; lY = t.pageY;
                 }
             }
+        }, { passive: false });
+
+        let lookId = null, lX, lY;
+        renderer.domElement.addEventListener('touchstart', e => {
+            for(let t of e.changedTouches) {
+                if(t.pageX > window.innerWidth / 2 && lookId === null) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; }
+            }
         });
         window.addEventListener('touchend', e => {
             for(let t of e.changedTouches) {
-                if(t.identifier === lookTouchId) lookTouchId = null;
+                if(t.identifier === jTouchId) { jActive = false; jTouchId = null; jStick.style.transform = ''; jInput = {x:0,z:0}; }
+                if(t.identifier === lookId) lookId = null;
             }
         });
 
+        function updateJoystick(t) {
+            const r = jBase.getBoundingClientRect();
+            const dx = t.clientX - (r.left+50), dy = t.clientY - (r.top+50);
+            const d = Math.min(50, Math.sqrt(dx*dx+dy*dy)), a = Math.atan2(dy,dx);
+            jStick.style.transform = `translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`;
+            jInput.x = (Math.cos(a)*d)/50; jInput.z = (Math.sin(a)*d)/50;
+        }
+
         function jump() { if(player.isGrounded) { player.velY = 0.12; player.isGrounded = false; } }
 
-        // --- マップ生成 ---
+        // --- マップ & アニメーション ---
         const mapData = new Map();
         function createTile(tx, tz) {
             const g = new THREE.Group();
@@ -186,7 +184,6 @@
 
         function animate() {
             requestAnimationFrame(animate);
-
             player.pos.y += player.velY;
             if (player.pos.y > 0) { player.velY -= 0.006; player.isGrounded = false; }
             else { player.pos.y = 0; player.velY = 0; player.isGrounded = true; }
@@ -222,13 +219,9 @@
                 if(player.isGrounded) player.bobTimer += player.currentSpeed * 3;
             }
 
-            const targetLean = (keys['e']?1:0) - (keys['q']?1:0);
-            player.lean += (targetLean - player.lean) * 0.1;
-
-            const bobY = player.isGrounded ? Math.sin(player.bobTimer)*0.05 : 0;
-            camera.position.set(player.pos.x, 1.5 + player.pos.y + bobY, player.pos.z);
-            const leanVec = new THREE.Vector3(player.lean * 0.7, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            camera.position.add(leanVec);
+            player.lean += (((keys['e']?1:0) - (keys['q']?1:0)) - player.lean) * 0.1;
+            camera.position.set(player.pos.x, 1.5 + player.pos.y + (player.isGrounded?Math.sin(player.bobTimer)*0.05:0), player.pos.z);
+            camera.position.add(new THREE.Vector3(player.lean * 0.7, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0)));
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.15);
 
             const ptx = Math.round(player.pos.x/5), ptz = Math.round(player.pos.z/5);
