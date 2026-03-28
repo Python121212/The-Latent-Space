@@ -3,32 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Audio Fixed</title>
+    <title>The Backrooms - Menu System</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
         canvas { display: block; }
-        #lock-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); color: #eee; display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
-        #stats { position: absolute; top: 15px; left: 15px; color: #fff; font-size: 12px; pointer-events: none; z-index: 100; }
+        
+        /* 共通レイヤー */
+        .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: 0.3s; }
+        
+        /* スタート画面 */
+        #lock-overlay { background: rgba(0,0,0,1); color: #dbd4a2; cursor: pointer; text-shadow: 0 0 10px rgba(219,212,162,0.5); }
+        
+        /* 一時停止メニュー */
+        #pause-menu { background: rgba(0,0,0,0.85); color: #dbd4a2; display: none; flex-direction: column; border: 1px solid #444; }
+        .menu-content { width: 280px; padding: 20px; text-align: center; background: #1a1a0d; border: 2px solid #333; }
+        .menu-title { font-size: 24px; margin-bottom: 20px; letter-spacing: 5px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .menu-btn { width: 100%; padding: 12px; margin: 10px 0; background: #2a2a1a; border: 1px solid #444; color: #dbd4a2; cursor: pointer; font-family: inherit; }
+        .menu-btn:active { background: #3d3d25; }
+        
+        /* 音量設定 */
+        .setting-row { margin: 15px 0; font-size: 14px; text-align: left; }
+        input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 5px; cursor: pointer; }
+
+        /* ゲームUI */
+        #stats { position: absolute; top: 15px; left: 15px; color: #dbd4a2; font-size: 12px; pointer-events: none; z-index: 100; }
         #stamina-bar { width: 100px; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #ffeb3b; }
+        #stamina-fill { width: 100%; height: 100%; background: #dbd4a2; }
+        #menu-open-btn { position: absolute; top: 15px; right: 15px; padding: 10px; color: #dbd4a2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); z-index: 300; pointer-events: auto; }
+
+        /* 操作系 */
         #mobile-ui { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
         .joy-container { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; pointer-events: auto; }
         #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1); }
-        #joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; }
+        #joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.15); border-radius: 50%; }
         .action-group { position: absolute; bottom: 30px; right: 30px; width: 220px; height: 220px; pointer-events: none; }
-        .btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 50%; font-weight: bold; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+        .btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #dbd4a2; border-radius: 50%; font-weight: bold; font-size: 14px; -webkit-tap-highlight-color: transparent; }
         #btn-jump { bottom: 85px; right: 85px; width: 85px; height: 85px; font-size: 16px; }
-        #btn-q { bottom: 140px; right: 0; width: 65px; height: 65px; }
-        #btn-e { bottom: 0; right: 140px; width: 65px; height: 65px; }
+        #btn-q { bottom: 140px; right: 0; width: 60px; height: 60px; }
+        #btn-e { bottom: 0; right: 140px; width: 60px; height: 60px; }
         #btn-shift { bottom: 0; right: 0; width: 80px; height: 80px; border-radius: 20px; }
     </style>
 </head>
 <body>
-    <div id="lock-overlay" onclick="startApp()">
-        <div style="text-align:center"><h1>THE BACKROOMS</h1><p>CLICK TO START</p></div>
+    <div id="lock-overlay" class="overlay" onclick="startApp()">
+        <div style="text-align:center"><h1>THE BACKROOMS</h1><p>TAP TO ENTER</p></div>
+    </div>
+
+    <div id="pause-menu" class="overlay">
+        <div class="menu-content">
+            <div class="menu-title">PAUSED</div>
+            <div class="setting-row">
+                HUM VOLUME: <span id="vol-val">50</span>%
+                <input type="range" id="vol-slider" min="0" max="100" value="50">
+            </div>
+            <button class="menu-btn" onclick="resumeGame()">RESUME</button>
+            <button class="menu-btn" onclick="location.reload()">RESTART</button>
+        </div>
     </div>
     
     <div id="stats">LVL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
+    <button id="menu-open-btn" onclick="toggleMenu()">MENU</button>
+
     <div id="mobile-ui">
         <div class="joy-container"><div id="joystick-base"><div id="joystick-stick"></div></div></div>
         <div class="action-group">
@@ -60,7 +95,6 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // --- オーディオシステム ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
 
@@ -68,49 +102,50 @@
         const footstepSound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
         
-        // 環境音の設定
+        let isPaused = false;
+
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
-            humSound.setVolume(0.5); // 音量を少し上げました
-            // ロード完了時にすでにゲーム開始していたら再生
-            if (document.pointerLockElement === renderer.domElement && !humSound.isPlaying) {
-                humSound.play();
-            }
+            humSound.setVolume(0.5);
         });
 
-        // 足音の設定
         audioLoader.load('footstep.mp3', (buffer) => {
             footstepSound.setBuffer(buffer);
             footstepSound.setVolume(0.6);
         });
 
-        // アプリ開始時の処理
+        // --- UI & Menu Functions ---
+        window.toggleMenu = () => {
+            if (document.getElementById('lock-overlay').style.display === 'none') {
+                isPaused = !isPaused;
+                document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
+                if (!isPaused) renderer.domElement.requestPointerLock();
+                else document.exitPointerLock();
+            }
+        };
+
+        window.resumeGame = () => {
+            isPaused = false;
+            document.getElementById('pause-menu').style.display = 'none';
+            renderer.domElement.requestPointerLock();
+        };
+
         window.startApp = () => {
             renderer.domElement.requestPointerLock();
-            
-            // ブラウザのオーディオ制限を解除
-            if (listener.context.state === 'suspended') {
-                listener.context.resume();
-            }
-
-            // 環境音再生
-            if (humSound.buffer && !humSound.isPlaying) {
-                humSound.play();
-            }
+            if (listener.context.state === 'suspended') listener.context.resume();
+            if (humSound.buffer && !humSound.isPlaying) humSound.play();
         };
 
-        const player = { 
-            pos: new THREE.Vector3(0, 0, 0), 
-            rot: { x: 0, y: 0 }, 
-            stamina: 100, 
-            currentSpeed: 0, 
-            bobTimer: 0, 
-            velY: 0, 
-            isGrounded: true, 
-            lean: 0, 
-            lastStepTime: 0 
-        };
+        const volSlider = document.getElementById('vol-slider');
+        volSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('vol-val').textContent = val;
+            humSound.setVolume(val / 100);
+        });
+
+        // --- Input & Control ---
+        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100, currentSpeed: 0, bobTimer: 0, velY: 0, isGrounded: true, lean: 0, lastStepTime: 0 };
         const keys = {};
         const clock = new THREE.Clock();
 
@@ -120,25 +155,36 @@
 
         const setupBtn = (id, key, cb) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key]=true; if(cb)cb(); }, {passive:false});
+            el.addEventListener('touchstart', e => { e.preventDefault(); if(!isPaused) keys[key]=true; if(cb && !isPaused)cb(); }, {passive:false});
             el.addEventListener('touchend', e => { e.preventDefault(); keys[key]=false; }, {passive:false});
         };
         const doJump = () => { if(player.isGrounded) player.velY = 0.13; };
         setupBtn('btn-q', 'q'); setupBtn('btn-e', 'e'); setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', ' ', doJump);
 
-        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key === ' ') doJump(); });
+        window.addEventListener('keydown', e => { 
+            if (e.key === 'Escape') toggleMenu();
+            if (!isPaused) {
+                keys[e.key.toLowerCase()] = true; 
+                if(e.key === ' ') doJump();
+            }
+        });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        
         document.addEventListener('pointerlockchange', () => { 
             const isLocked = document.pointerLockElement === renderer.domElement;
-            document.getElementById('lock-overlay').style.display = isLocked ? 'none' : 'flex'; 
+            document.getElementById('lock-overlay').style.display = (isLocked || isPaused) ? 'none' : 'flex'; 
+            if (!isLocked && !isPaused) isPaused = true; // ESCでのロック解除をメニュー扱いに
+            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
         });
-        document.addEventListener('mousemove', (e) => { if (document.pointerLockElement === renderer.domElement) { player.rot.y -= e.movementX * 0.002; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002)); } });
+
+        document.addEventListener('mousemove', (e) => { if (document.pointerLockElement === renderer.domElement && !isPaused) { player.rot.y -= e.movementX * 0.002; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002)); } });
 
         let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jStick = document.getElementById('joystick-stick'), jBase = document.getElementById('joystick-base');
-        renderer.domElement.addEventListener('touchstart', e => { for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
-        jBase.addEventListener('touchstart', e => { e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier; }, {passive:false});
+        renderer.domElement.addEventListener('touchstart', e => { if(isPaused) return; for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
+        jBase.addEventListener('touchstart', e => { if(isPaused) return; e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier; }, {passive:false});
         window.addEventListener('touchmove', e => {
+            if(isPaused) return;
             for(let t of e.changedTouches) {
                 if(t.identifier === lookId) { player.rot.y -= (t.pageX-lX)*0.006; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x-(t.pageY-lY)*0.006)); lX=t.pageX; lY=t.pageY; }
                 if(jActive && t.identifier === jTouchId) {
@@ -177,8 +223,12 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const elapsedTime = clock.getElapsedTime();
+            if (isPaused) {
+                if (footstepSound.isPlaying) footstepSound.stop();
+                return;
+            }
 
+            const elapsedTime = clock.getElapsedTime();
             player.pos.y += player.velY;
             if (player.pos.y > 0) { player.velY -= 0.007; player.isGrounded = false; } else { player.pos.y = 0; player.velY = 0; player.isGrounded = true; }
 
@@ -205,9 +255,7 @@
                     });
                 }
                 if(!colX) player.pos.x = nextX; if(!colZ) player.pos.z = nextZ;
-                
                 player.bobTimer += player.currentSpeed * 4;
-
                 const stepInterval = keys['shift'] ? 0.35 : 0.52;
                 if (elapsedTime - player.lastStepTime > stepInterval && player.isGrounded) {
                     if (footstepSound.buffer) {
@@ -218,7 +266,6 @@
                     player.lastStepTime = elapsedTime;
                 }
             } else {
-                // 停止時は足音を即座に止める
                 if (footstepSound.isPlaying) footstepSound.stop();
             }
 
@@ -226,7 +273,6 @@
             camera.position.set(player.pos.x, 1.6 + player.pos.y + Math.sin(player.bobTimer)*0.05, player.pos.z);
             camera.position.add(new THREE.Vector3(player.lean * 0.6, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0)));
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.15);
-
             playerLight.position.set(player.pos.x, 2.2, player.pos.z);
             playerLight.intensity = 1.5 + Math.sin(Date.now()*0.01)*0.1;
 
