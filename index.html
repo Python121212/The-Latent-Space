@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Final Audio & Menu Sync</title>
+    <title>The Backrooms - Audio Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
         canvas { display: block; }
@@ -96,12 +96,12 @@
         const audioLoader = new THREE.AudioLoader();
         
         let isPaused = false;
-        let audioReady = false;
+        let currentHumVolume = 0.5; // スライダーのデフォルト値(50%)と一致させる
 
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
-            humSound.setVolume(0.5);
+            humSound.setVolume(currentHumVolume);
         });
 
         audioLoader.load('footstep.mp3', (buffer) => {
@@ -109,13 +109,16 @@
             footstepSound.setVolume(0.6);
         });
 
-        // 音声を強制的に有効化する関数
+        // 音声を強制的に有効化・更新する関数
         function activateAudio() {
             if (listener.context.state === 'suspended') {
                 listener.context.resume();
             }
-            if (humSound.buffer && !humSound.isPlaying) {
-                humSound.play();
+            // スライダーの現在値を取得して適用
+            const vol = document.getElementById('vol-slider').value / 100;
+            if (humSound.buffer) {
+                humSound.setVolume(vol);
+                if (!humSound.isPlaying) humSound.play();
             }
         }
 
@@ -148,7 +151,8 @@
         volSlider.addEventListener('input', (e) => {
             const val = e.target.value;
             document.getElementById('vol-val').textContent = val;
-            humSound.setVolume(val / 100);
+            currentHumVolume = val / 100;
+            if(humSound.buffer) humSound.setVolume(currentHumVolume);
         });
 
         // --- プレイヤー & 入力 ---
@@ -193,7 +197,6 @@
             } 
         });
 
-        // ジョイスティック
         let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jStick = document.getElementById('joystick-stick'), jBase = document.getElementById('joystick-base');
         renderer.domElement.addEventListener('touchstart', e => { if(isPaused) return; for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
@@ -212,7 +215,6 @@
         }, { passive: false });
         window.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === lookId) lookId = null; if(t.identifier === jTouchId) { jActive = false; jInput = {x:0,z:0}; jStick.style.transform = ''; } } });
 
-        // マップ生成
         const mapData = new Map();
         function createTile(tx, tz) {
             const group = new THREE.Group();
