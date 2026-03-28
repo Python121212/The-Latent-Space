@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Stereo Audio Fix</title>
+    <title>The Backrooms - Audio Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; }
@@ -60,11 +60,9 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // --- オーディオ設定 (ステレオ固定) ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
 
-        // Position無しの通常Audioクラスを使用することでステレオ再生にする
         const humSound = new THREE.Audio(listener);
         const footstepSound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
@@ -72,17 +70,20 @@
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
-            humSound.setVolume(0.4);
+            humSound.setVolume(0.3);
         });
 
         audioLoader.load('footstep.mp3', (buffer) => {
             footstepSound.setBuffer(buffer);
-            footstepSound.setVolume(0.6);
+            footstepSound.setVolume(0.5);
         });
 
         window.startApp = () => {
             renderer.domElement.requestPointerLock();
-            if (humSound.buffer && !humSound.isPlaying) humSound.play();
+            // 環境音を確実に再生開始
+            if (humSound.buffer) {
+                if (!humSound.isPlaying) humSound.play();
+            }
         };
 
         const player = { 
@@ -194,13 +195,15 @@
                 const stepInterval = keys['shift'] ? 0.35 : 0.52;
                 if (elapsedTime - player.lastStepTime > stepInterval && player.isGrounded) {
                     if (footstepSound.buffer) {
-                        // ステレオ再生のために再生ごとにstop/start
                         if (footstepSound.isPlaying) footstepSound.stop();
                         footstepSound.setPlaybackRate(keys['shift'] ? 1.1 : 1.0);
                         footstepSound.play();
                     }
                     player.lastStepTime = elapsedTime;
                 }
+            } else {
+                // 移動していないときは足音を即座に止める
+                if (footstepSound.isPlaying) footstepSound.stop();
             }
 
             player.lean += (((keys['e']?1:0)-(keys['q']?1:0)) - player.lean) * 0.1;
