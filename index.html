@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lean & Lite</title>
+    <title>The Backrooms - Lean Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; z-index: 10; }
-        #stamina-bar { width: 100px; height: 4px; background: #444; margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #ddd; transition: width 0.1s; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; z-index: 110; }
+        #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
+        #stamina-fill { width: 100%; height: 100%; background: #eee; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; pointer-events: none; font-size: 14px; line-height: 1.6; }
     </style>
 </head>
 <body>
-    <div id="ui">LEVEL 0 | Q/E: LEAN<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">CLICK TO START<br>(WASD: Move | Shift: Run | Q/E: Lean)</div>
+    <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
+    <div id="msg">CLICK TO START (PC)<br>WASD: Move, Mouse: Look<br><b>Q/E: Lean (Peek around corners)</b><br><br>SWIPE TO LOOK (MOBILE)</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -26,39 +26,60 @@
         const mapData = new Map();
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a10);
-        scene.fog = new THREE.Fog(0x1a1a10, 1, 15);
+        scene.fog = new THREE.Fog(0x1a1a10, 1, 12);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 20);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
+        // カメラの初期回転順序を'YXZ'に設定（視点移動のため）
+        camera.rotation.order = 'YXZ';
+        
         const renderer = new THREE.WebGLRenderer({ antialias: false, precision: 'lowp' });
-        renderer.setPixelRatio(0.6); 
+        renderer.setPixelRatio(0.5); 
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const wallMat = new THREE.MeshBasicMaterial({ color: 0x8a825d });
-        const floorMat = new THREE.MeshBasicMaterial({ color: 0x6a623d });
+        const floorMat = new THREE.MeshBasicMaterial({ color: 0x7a724d });
         const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
         const player = { 
             pos: new THREE.Vector3(0, 1.5, 0), 
-            rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
+            rot: new THREE.Vector2(0, 0), // x: pitch, y: yaw
             stamina: 100,
-            lean: 0, // 現在のリーン量
-            targetLean: 0 // 目標のリーン量
+            leanOffset: 0, // 現在のリーンの横移動量
+            leanRoll: 0     // 現在のリーンの回転量（首の傾き）
         };
-
         const keys = {};
+        const input = { moveX: 0, moveY: 0, isTouch: false };
+
+        // --- PC 操作 ---
         document.addEventListener('mousedown', () => {
-            renderer.domElement.requestPointerLock();
+            if(!input.isTouch) renderer.domElement.requestPointerLock();
             document.getElementById('msg').style.display = 'none';
         });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.0025;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.0025));
+                player.rot.y -= e.movementX * 0.003;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.003));
             }
         });
-        window.onkeydown = e => { keys[e.key.toLowerCase()] = true; };
-        window.onkeyup = e => { keys[e.key.toLowerCase()] = false; };
+        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+
+        // --- スマホ 操作 (省略せず維持) ---
+        let lastT = null;
+        document.addEventListener('touchstart', e => { input.isTouch = true; lastT = e.touches[0]; document.getElementById('msg').style.display = 'none'; });
+        document.addEventListener('touchmove', e => {
+            const t = e.touches[0];
+            if (t.clientX > window.innerWidth / 2) {
+                player.rot.y -= (t.clientX - lastT.clientX) * 0.005;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - lastT.clientY) * 0.005));
+            } else {
+                input.moveX = Math.max(-1, Math.min(1, (t.clientX - lastT.clientX) * 0.1));
+                input.moveY = Math.max(-1, Math.min(1, (t.clientY - lastT.clientY) * 0.1));
+            }
+            lastT = t;
+        });
+        document.addEventListener('touchend', () => { input.moveX = input.moveY = 0; });
 
         function seededRand(x, z) { return (Math.abs(Math.sin(x * 12.98 + z * 78.23) * 43758.54) % 1); }
 
@@ -67,15 +88,15 @@
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
             floor.rotation.x = -Math.PI/2; group.add(floor);
             
-            if (seededRand(tx, tz) < 0.7) {
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.4), lampMat);
+            if (seededRand(tx, tz) < 0.8) {
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), lampMat);
                 lamp.position.y = 2.95; group.add(lamp);
             }
 
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
-                [[0, 1.5, 2.5, 5, 3, 0.15], [2.5, 1.5, 0, 0.15, 3, 5]].forEach((c, i) => {
-                    if (seededRand(tx + i + 7, tz + i + 7) > 0.7) {
+                [[0, 1.5, 2.5, 5, 3, 0.1], [2.5, 1.5, 0, 0.1, 3, 5]].forEach((c, i) => {
+                    if (seededRand(tx + i + 5, tz + i + 5) > 0.7) {
                         const w = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
                         w.position.set(c[0], c[1], c[2]); group.add(w);
                         walls.push(new THREE.Box3().setFromObject(w).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
@@ -100,21 +121,23 @@
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
 
-            // --- リーン（Q/E）の計算 ---
-            player.targetLean = 0;
-            if (keys['q']) player.targetLean = 0.4;
-            if (keys['e']) player.targetLean = -0.4;
-            // 数値を滑らかに変化させる（Lerp）
-            player.lean += (player.targetLean - player.lean) * 0.15;
-
             // 移動計算
-            let mx = (keys['d']?1:0) - (keys['a']?1:0);
-            let mz = (keys['s']?1:0) - (keys['w']?1:0);
+            let mx = (keys['d']?1:0) - (keys['a']?1:0) + input.moveX;
+            let mz = (keys['s']?1:0) - (keys['w']?1:0) + input.moveY;
             
-            const isSprinting = keys['shift'] && player.stamina > 0 && (mx!==0||mz!==0);
-            player.stamina += isSprinting ? -0.8 : 0.4;
+            const isSprinting = keys['shift'] && player.stamina > 0;
+            player.stamina += isSprinting ? -0.8 : 0.5;
             player.stamina = Math.max(0, Math.min(100, player.stamina));
             document.getElementById('stamina-fill').style.width = player.stamina + '%';
+
+            // --- リーン計算ロジック ---
+            let targetLean = 0;
+            if (keys['q']) targetLean = 1;      // 左にリーン
+            else if (keys['e']) targetLean = -1; // 右にリーン
+
+            // リーンの横移動（X Offset）と回転（Roll Z）を滑らかに変化させる
+            player.leanOffset += (targetLean * 0.6 - player.leanOffset) * 0.2; // 最大0.6m横にずれる
+            player.leanRoll += (targetLean * 0.25 - player.leanRoll) * 0.2;     // 最大約14度傾く（0.25ラジアン）
 
             if (mx !== 0 || mz !== 0) {
                 const speed = isSprinting ? 0.12 : 0.06;
@@ -136,13 +159,14 @@
                 player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
             }
 
-            // カメラの最終的な適用（座標 + リーンのズレ）
-            camera.position.copy(player.pos);
-            // リーンに合わせてカメラを横に少しずらす
-            const leanOffset = new THREE.Vector3(player.lean, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            camera.position.add(leanOffset);
+            // カメラの位置設定：プレイヤー位置 + リーンの横ずれを適用
+            // リーンのずれは、現在のプレイヤーの向き（yaw）に対して横方向（right）に適用する
+            const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
+            camera.position.copy(player.pos).add(right.multiplyScalar(player.leanOffset));
             
-            camera.rotation.set(player.rot.x, player.rot.y, player.lean * 0.5, 'YXZ');
+            // カメラの回転設定：pitch (X), yaw (Y) + リーンのroll (Z)を適用
+            // 順序が'YXZ'なので、まずY(左右)、次にX(上下)、最後にZ(首傾げ)が適用される
+            camera.rotation.set(player.rot.x, player.rot.y, player.leanRoll);
             
             updateMap();
             renderer.render(scene, camera);
