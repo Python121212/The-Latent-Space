@@ -1,144 +1,167 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lean Key Swapped</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
-        canvas { display: block; image-rendering: pixelated; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; }
-        #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #eee; }
-        #msg { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #aaa; font-size: 12px; pointer-events: none; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Backrooms - Head Bobbing Update</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; image-rendering: pixelated; }
+        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; }
+        #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
+        #stamina-fill { width: 100%; height: 100%; background: #eee; }
+        #msg { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #aaa; font-size: 12px; pointer-events: none; }
+    </style>
 </head>
 <body>
-    <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">Q: Lean Left / E: Lean Right</div>
+    <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
+    <div id="msg">Q: Lean Left / E: Lean Right (With Head Bob)</div>
 
-    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
-    <script type="module">
-        import * as THREE from 'three';
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+    <script type="module">
+        import * as THREE from 'three';
 
-        const TILE_SIZE = 5;
-        const VIEW_DIST = 3;
-        const mapData = new Map();
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1a10);
-        scene.fog = new THREE.Fog(0x1a1a10, 1, 15);
+        const TILE_SIZE = 5;
+        const VIEW_DIST = 3;
+        const mapData = new Map();
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a10);
+        scene.fog = new THREE.Fog(0x1a1a10, 1, 15);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
-        camera.rotation.order = 'YXZ';
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setPixelRatio(0.5); 
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
+        camera.rotation.order = 'YXZ';
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setPixelRatio(0.5); 
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        const wallMat = new THREE.MeshBasicMaterial({ color: 0x8a825d });
-        const floorMat = new THREE.MeshBasicMaterial({ color: 0x7a724d });
-        const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const wallMat = new THREE.MeshBasicMaterial({ color: 0x8a825d });
+        const floorMat = new THREE.MeshBasicMaterial({ color: 0x7a724d });
+        const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-        const player = { 
-            pos: new THREE.Vector3(0, 1.5, 0), 
-            rot: { x: 0, y: 0 },
-            stamina: 100,
-            lean: 0 // Q(左)で-1.0, E(右)で1.0へ向かう
-        };
-        const keys = {};
+        const player = { 
+            pos: new THREE.Vector3(0, 1.5, 0), 
+            rot: { x: 0, y: 0 },
+            stamina: 100,
+            lean: 0 // Q(左)で-1.0, E(右)で1.0へ向かう
+        };
+        const keys = {};
 
-        document.addEventListener('mousedown', () => renderer.domElement.requestPointerLock());
-        document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.003;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.003));
+        document.addEventListener('mousedown', () => renderer.domElement.requestPointerLock());
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === renderer.domElement) {
+                player.rot.y -= e.movementX * 0.003;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.003));
+            }
+        });
+        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+
+        function seededRand(x, z) { return (Math.abs(Math.sin(x * 12.98 + z * 78.23) * 43758.54) % 1); }
+
+        function createTile(tx, tz) {
+            const group = new THREE.Group();
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
+            floor.rotation.x = -Math.PI/2; group.add(floor);
+            if (seededRand(tx, tz) < 0.7) {
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), lampMat);
+                lamp.position.y = 2.95; group.add(lamp);
+            }
+            const walls = [];
+            if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
+                [[0, 1.5, 2.5, 5, 3, 0.15], [2.5, 1.5, 0, 0.15, 3, 5]].forEach((c, i) => {
+                    if (seededRand(tx + i + 7, tz + i + 7) > 0.7) {
+                        const w = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
+                        w.position.set(c[0], c[1], c[2]); group.add(w);
+                        walls.push(new THREE.Box3().setFromObject(w).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
+                    }
+                });
+            }
+            group.position.set(tx * TILE_SIZE, 0, tz * TILE_SIZE);
+            return { mesh: group, walls };
+        }
+
+        function updateMap() {
+            const px = Math.round(player.pos.x / TILE_SIZE), pz = Math.round(player.pos.z / TILE_SIZE);
+            for (let x = px-VIEW_DIST; x <= px+VIEW_DIST; x++) {
+                for (let z = pz-VIEW_DIST; z <= pz+VIEW_DIST; z++) {
+                    if (!mapData.has(`${x},${z}`)) {
+                        const t = createTile(x, z); mapData.set(`${x},${z}`, t); scene.add(t.mesh);
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now() * 0.001;
+
+            let mx = (keys['d']?1:0) - (keys['a']?1:0);
+            let mz = (keys['s']?1:0) - (keys['w']?1:0);
+            const isMoving = mx !== 0 || mz !== 0; // 移動中フラグ
+            const isSprinting = keys['shift'] && player.stamina > 0 && isMoving;
+            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -0.7 : 0.4)));
+            document.getElementById('stamina-fill').style.width = player.stamina + '%';
+
+            if (isMoving) {
+                const speed = isSprinting ? 0.12 : 0.06;
+                const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
+                ['x', 'z'].forEach(axis => {
+                    const next = player.pos[axis] + dir[axis] * speed;
+                    const testBox = new THREE.Box3().setFromCenterAndSize(player.pos.clone().setComponent(axis==='x'?0:2, next), new THREE.Vector3(0.6, 1, 0.6));
+                    let hit = false;
+                    const tx = Math.round(player.pos.x / TILE_SIZE), tz = Math.round(player.pos.z / TILE_SIZE);
+                    for(let x=-1; x<=1; x++) for(let z=-1; z<=1; z++) {
+                        const t = mapData.get(`${tx+x},${tz+z}`);
+                        if(t) t.walls.forEach(w => { if(testBox.intersectsBox(w)) hit = true; });
+                    }
+                    if(!hit) player.pos[axis] = next;
+                });
+                // 以前のpos.y計算は削除（Head Bobに統合）
+            }
+
+            // --- HEAD BOBBING & LEAN ---
+            // Eで右(1.0), Qで左(-1.0)
+            const targetLean = (keys['e'] ? 1 : 0) - (keys['q'] ? 1 : 0);
+            player.lean += (targetLean - player.lean) * 0.15;
+
+            // 1. 位置のオフセット (Lean + Bob)
+            let bobY = 0;
+            let bobZ = 0; // 首傾げ揺れ
+
+            if (isMoving) {
+                // 移動時の揺れ幅と速さを計算
+                const bobFreq = isSprinting ? 16 : 10; // 速さ
+                const bobAmpY = isSprinting ? 0.06 : 0.03; // 上下幅
+                const bobAmpZ = isSprinting ? 0.04 : 0.02; // 首傾げ幅
+
+                bobY = Math.sin(time * bobFreq) * bobAmpY;
+                bobZ = Math.cos(time * bobFreq) * bobAmpZ;
+            } else {
+                // 停止時はHead Bob値を0へスムーズに戻す
+                bobY *= 0.8;
+                bobZ *= 0.8;
             }
-        });
-        window.onkeydown = e => keys[e.key.toLowerCase()] = true;
-        window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
-        function seededRand(x, z) { return (Math.abs(Math.sin(x * 12.98 + z * 78.23) * 43758.54) % 1); }
-
-        function createTile(tx, tz) {
-            const group = new THREE.Group();
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
-            floor.rotation.x = -Math.PI/2; group.add(floor);
-            if (seededRand(tx, tz) < 0.7) {
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), lampMat);
-                lamp.position.y = 2.95; group.add(lamp);
-            }
-            const walls = [];
-            if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
-                [[0, 1.5, 2.5, 5, 3, 0.15], [2.5, 1.5, 0, 0.15, 3, 5]].forEach((c, i) => {
-                    if (seededRand(tx + i + 7, tz + i + 7) > 0.7) {
-                        const w = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
-                        w.position.set(c[0], c[1], c[2]); group.add(w);
-                        walls.push(new THREE.Box3().setFromObject(w).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
-                    }
-                });
-            }
-            group.position.set(tx * TILE_SIZE, 0, tz * TILE_SIZE);
-            return { mesh: group, walls };
-        }
-
-        function updateMap() {
-            const px = Math.round(player.pos.x / TILE_SIZE), pz = Math.round(player.pos.z / TILE_SIZE);
-            for (let x = px-VIEW_DIST; x <= px+VIEW_DIST; x++) {
-                for (let z = pz-VIEW_DIST; z <= pz+VIEW_DIST; z++) {
-                    if (!mapData.has(`${x},${z}`)) {
-                        const t = createTile(x, z); mapData.set(`${x},${z}`, t); scene.add(t.mesh);
-                    }
-                }
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = performance.now() * 0.001;
-
-            let mx = (keys['d']?1:0) - (keys['a']?1:0);
-            let mz = (keys['s']?1:0) - (keys['w']?1:0);
-            const isSprinting = keys['shift'] && player.stamina > 0 && (mx||mz);
-            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -0.7 : 0.4)));
-            document.getElementById('stamina-fill').style.width = player.stamina + '%';
-
-            if (mx !== 0 || mz !== 0) {
-                const speed = isSprinting ? 0.12 : 0.06;
-                const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                ['x', 'z'].forEach(axis => {
-                    const next = player.pos[axis] + dir[axis] * speed;
-                    const testBox = new THREE.Box3().setFromCenterAndSize(player.pos.clone().setComponent(axis==='x'?0:2, next), new THREE.Vector3(0.6, 1, 0.6));
-                    let hit = false;
-                    const tx = Math.round(player.pos.x / TILE_SIZE), tz = Math.round(player.pos.z / TILE_SIZE);
-                    for(let x=-1; x<=1; x++) for(let z=-1; z<=1; z++) {
-                        const t = mapData.get(`${tx+x},${tz+z}`);
-                        if(t) t.walls.forEach(w => { if(testBox.intersectsBox(w)) hit = true; });
-                    }
-                    if(!hit) player.pos[axis] = next;
-                });
-                player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
-            }
-
-            // --- LEAN SWAPPED ---
-            // Eで右(1.0), Qで左(-1.0)
-            const targetLean = (keys['e'] ? 1 : 0) - (keys['q'] ? 1 : 0);
-            player.lean += (targetLean - player.lean) * 0.15;
-
-            // 1. 位置のオフセット
-            const leanDist = player.lean * 0.8; 
-            const leanOffset = new THREE.Vector3(leanDist, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            camera.position.copy(player.pos).add(leanOffset);
-            
-            // 2. 回転（首を傾ける）
-            // leanが正(E:右)のとき、視界を右（負のZ回転）に傾ける
-            camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.25);
-            
-            updateMap();
-            renderer.render(scene, camera);
-        }
-        animate();
-        window.onresize = () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
-    </script>
+            const leanDist = player.lean * 0.8; 
+            const leanOffset = new THREE.Vector3(leanDist, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
+           
+            // カメラ位置: プレイヤー中心 + 身長 + ボブ上下 + リーン横
+            camera.position.copy(player.pos)
+                .add(new THREE.Vector3(0, 1.5 + bobY, 0)) // 身長1.5m + ボブ上下
+                .add(leanOffset); // リーン横
+            
+            // 2. 回転（首を傾ける - Lean + Bob）
+            // leanが正(E:右)のとき、視界を右（負のZ回転）に傾ける
+            // bobZを足し合わせることで、移動中の首傾げ揺れを表現
+            camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.25 + bobZ);
+            
+            updateMap();
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.onresize = () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+    </script>
 </body>
 </html>
