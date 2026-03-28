@@ -3,19 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Ultra Lite & Fix PC</title>
+    <title>The Backrooms - Lean & Lite</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
-        canvas { display: block; image-rendering: pixelated; } /* ドット感を出しつつ軽く */
-        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; }
-        #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #eee; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; pointer-events: none; }
+        body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: monospace; }
+        canvas { display: block; image-rendering: pixelated; }
+        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 11px; pointer-events: none; text-shadow: 1px 1px #000; line-height: 1.4; }
+        #stamina-bar { width: 80px; height: 3px; background: #444; margin-top: 4px; }
+        #stamina-fill { width: 100%; height: 100%; background: #fff; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; pointer-events: none; opacity: 0.6; }
     </style>
 </head>
 <body>
-    <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">CLICK TO START (PC)<br>SWIPE TO LOOK (MOBILE)</div>
+    <div id="ui">
+        ASYNC_SYSTEM v0.2<br>
+        LEAN: [Q] LEFT / [E] RIGHT
+        <div id="stamina-bar"><div id="stamina-fill"></div></div>
+    </div>
+    <div id="msg">CLICK TO START<br>WASD: MOVE / Q,E: LEAN</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -28,70 +32,60 @@
         scene.background = new THREE.Color(0x1a1a10);
         scene.fog = new THREE.Fog(0x1a1a10, 1, 12);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
-        const renderer = new THREE.WebGLRenderer({ antialias: false, precision: 'lowp' });
-        renderer.setPixelRatio(0.5); // 負荷を極限まで下げる
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 20);
+        const renderer = new THREE.WebGLRenderer({ antialias: false, precision: 'lowp', powerPreference: "high-performance" });
+        renderer.setPixelRatio(0.5); 
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // ライト計算をしないマテリアルに変更
+        // 軽量マテリアルの共通化
         const wallMat = new THREE.MeshBasicMaterial({ color: 0x8a825d });
         const floorMat = new THREE.MeshBasicMaterial({ color: 0x7a724d });
         const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-        const player = { pos: new THREE.Vector3(0, 1.5, 0), rot: new THREE.Euler(0, 0, 0, 'YXZ'), stamina: 100 };
+        const player = { 
+            pos: new THREE.Vector3(0, 1.5, 0), 
+            rot: new THREE.Euler(0, 0, 0, 'YXZ'), 
+            stamina: 100,
+            lean: 0 // リーンの角度
+        };
         const keys = {};
-        const input = { lookX: 0, lookY: 0, moveX: 0, moveY: 0, isTouch: false };
 
-        // --- PC 視点操作 ---
+        // マウス・キーボード制御
         document.addEventListener('mousedown', () => {
-            if(!input.isTouch) renderer.domElement.requestPointerLock();
+            renderer.domElement.requestPointerLock();
             document.getElementById('msg').style.display = 'none';
         });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.003;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.003));
+                player.rot.y -= e.movementX * 0.0025;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.0025));
             }
         });
         window.onkeydown = e => keys[e.key.toLowerCase()] = true;
         window.onkeyup = e => keys[e.key.toLowerCase()] = false;
-
-        // --- スマホ 視点操作 ---
-        let lastT = null;
-        document.addEventListener('touchstart', e => { input.isTouch = true; lastT = e.touches[0]; document.getElementById('msg').style.display = 'none'; }, {passive: false});
-        document.addEventListener('touchmove', e => {
-            const t = e.touches[0];
-            if (t.clientX > window.innerWidth / 2) { // 画面右側で視点移動
-                player.rot.y -= (t.clientX - lastT.clientX) * 0.005;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - lastT.clientY) * 0.005));
-            } else { // 画面左側で移動
-                input.moveX = (t.clientX - lastT.clientX) * 0.1;
-                input.moveY = (t.clientY - lastT.clientY) * 0.1;
-            }
-            lastT = t;
-        }, {passive: false});
-        document.addEventListener('touchend', () => { input.moveX = input.moveY = 0; });
 
         function seededRand(x, z) { return (Math.abs(Math.sin(x * 12.98 + z * 78.23) * 43758.54) % 1); }
 
         function createTile(tx, tz) {
             const group = new THREE.Group();
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
-            floor.rotation.x = -Math.PI/2; group.add(floor);
+            floor.rotation.x = -Math.PI/2;
+            group.add(floor);
             
-            const r = seededRand(tx, tz);
-            if (r < 0.8) {
-                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), lampMat);
-                lamp.position.y = 2.95; group.add(lamp);
+            if (seededRand(tx, tz) < 0.8) {
+                const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.4), lampMat);
+                lamp.position.y = 2.95;
+                group.add(lamp);
             }
 
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
                 [[0, 1.5, 2.5, 5, 3, 0.1], [2.5, 1.5, 0, 0.1, 3, 5]].forEach((c, i) => {
-                    if (seededRand(tx + i + 5, tz + i + 5) > 0.7) {
+                    if (seededRand(tx + i + 7, tz + i + 7) > 0.72) {
                         const w = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
-                        w.position.set(c[0], c[1], c[2]); group.add(w);
+                        w.position.set(c[0], c[1], c[2]);
+                        group.add(w);
                         walls.push(new THREE.Box3().setFromObject(w).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
                     }
                 });
@@ -105,7 +99,11 @@
             for (let x = px-VIEW_DIST; x <= px+VIEW_DIST; x++) {
                 for (let z = pz-VIEW_DIST; z <= pz+VIEW_DIST; z++) {
                     const k = `${x},${z}`;
-                    if (!mapData.has(k)) { const t = createTile(x, z); mapData.set(k, t); scene.add(t.mesh); }
+                    if (!mapData.has(k)) {
+                        const t = createTile(x, z);
+                        mapData.set(k, t);
+                        scene.add(t.mesh);
+                    }
                 }
             }
         }
@@ -114,17 +112,21 @@
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
 
-            // 移動計算
-            let mx = (keys['d']?1:0) - (keys['a']?1:0) + input.moveX;
-            let mz = (keys['s']?1:0) - (keys['w']?1:0) + input.moveY;
+            // --- リーン(Lean)の処理 ---
+            const targetLean = (keys['q'] ? 0.25 : 0) + (keys['e'] ? -0.25 : 0);
+            player.lean += (targetLean - player.lean) * 0.12; // 滑らかに傾ける
+
+            // --- 移動とスタミナ ---
+            let mx = (keys['d']?1:0) - (keys['a']?1:0);
+            let mz = (keys['s']?1:0) - (keys['w']?1:0);
+            const isSprinting = keys['shift'] && player.stamina > 0 && (mx!==0 || mz!==0);
             
-            const isSprinting = keys['shift'] && player.stamina > 0;
-            player.stamina += isSprinting ? -0.8 : 0.5;
+            player.stamina += isSprinting ? -0.7 : 0.4;
             player.stamina = Math.max(0, Math.min(100, player.stamina));
             document.getElementById('stamina-fill').style.width = player.stamina + '%';
 
             if (mx !== 0 || mz !== 0) {
-                const speed = isSprinting ? 0.12 : 0.06;
+                const speed = isSprinting ? 0.11 : 0.06;
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 
                 ['x', 'z'].forEach(axis => {
@@ -143,13 +145,26 @@
                 player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
             }
 
+            // カメラ更新
             camera.position.copy(player.pos);
-            camera.rotation.copy(player.rot);
+            // 視点の回転にリーンのZ軸回転を追加
+            camera.rotation.set(player.rot.x, player.rot.y, player.lean, 'YXZ');
+            
+            // リーンの時は少しカメラを横にずらすとよりリアル
+            if (Math.abs(player.lean) > 0.01) {
+                const leanOffset = new THREE.Vector3(player.lean * 0.8, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
+                camera.position.add(leanOffset);
+            }
+
             updateMap();
             renderer.render(scene, camera);
         }
         animate();
-        window.onresize = () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
+        window.onresize = () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
     </script>
 </body>
 </html>
