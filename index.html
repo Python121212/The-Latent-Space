@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lean Update</title>
+    <title>The Backrooms - Lean Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; z-index: 110; }
+        #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; }
         #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
         #stamina-fill { width: 100%; height: 100%; background: #eee; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; pointer-events: none; font-size: 14px; line-height: 1.6; }
+        #msg { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #aaa; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">CLICK TO START (PC)<br>WASD: Move, Mouse: Look<br><b>Q/E: Lean (Peek around corners)</b><br><br>SWIPE TO LOOK (MOBILE)</div>
+    <div id="msg">Q / E to Lean (Peek around corners)</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -26,13 +26,12 @@
         const mapData = new Map();
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a10);
-        scene.fog = new THREE.Fog(0x1a1a10, 1, 12);
+        scene.fog = new THREE.Fog(0x1a1a10, 1, 15);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
-        // カメラの初期回転順序を'YXZ'に設定（視点移動のため）
         camera.rotation.order = 'YXZ';
         
-        const renderer = new THREE.WebGLRenderer({ antialias: false, precision: 'lowp' });
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setPixelRatio(0.5); 
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
@@ -43,19 +42,14 @@
 
         const player = { 
             pos: new THREE.Vector3(0, 1.5, 0), 
-            rot: new THREE.Vector2(0, 0), // x: pitch, y: yaw
+            rot: { x: 0, y: 0 },
             stamina: 100,
-            leanOffset: 0, // 現在のリーンの横移動量
-            leanRoll: 0     // 現在のリーンの回転量（首の傾き）
+            lean: 0 // -1 (Right) to 1 (Left)
         };
         const keys = {};
-        const input = { moveX: 0, moveY: 0, isTouch: false };
 
-        // --- PC 操作 ---
-        document.addEventListener('mousedown', () => {
-            if(!input.isTouch) renderer.domElement.requestPointerLock();
-            document.getElementById('msg').style.display = 'none';
-        });
+        // PC Lock
+        document.addEventListener('mousedown', () => renderer.domElement.requestPointerLock());
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
                 player.rot.y -= e.movementX * 0.003;
@@ -65,38 +59,20 @@
         window.onkeydown = e => keys[e.key.toLowerCase()] = true;
         window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
-        // --- スマホ 操作 (省略せず維持) ---
-        let lastT = null;
-        document.addEventListener('touchstart', e => { input.isTouch = true; lastT = e.touches[0]; document.getElementById('msg').style.display = 'none'; });
-        document.addEventListener('touchmove', e => {
-            const t = e.touches[0];
-            if (t.clientX > window.innerWidth / 2) {
-                player.rot.y -= (t.clientX - lastT.clientX) * 0.005;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.clientY - lastT.clientY) * 0.005));
-            } else {
-                input.moveX = Math.max(-1, Math.min(1, (t.clientX - lastT.clientX) * 0.1));
-                input.moveY = Math.max(-1, Math.min(1, (t.clientY - lastT.clientY) * 0.1));
-            }
-            lastT = t;
-        });
-        document.addEventListener('touchend', () => { input.moveX = input.moveY = 0; });
-
         function seededRand(x, z) { return (Math.abs(Math.sin(x * 12.98 + z * 78.23) * 43758.54) % 1); }
 
         function createTile(tx, tz) {
             const group = new THREE.Group();
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE), floorMat);
             floor.rotation.x = -Math.PI/2; group.add(floor);
-            
-            if (seededRand(tx, tz) < 0.8) {
+            if (seededRand(tx, tz) < 0.7) {
                 const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.5), lampMat);
                 lamp.position.y = 2.95; group.add(lamp);
             }
-
             const walls = [];
             if (Math.abs(tx) > 1 || Math.abs(tz) > 1) {
-                [[0, 1.5, 2.5, 5, 3, 0.1], [2.5, 1.5, 0, 0.1, 3, 5]].forEach((c, i) => {
-                    if (seededRand(tx + i + 5, tz + i + 5) > 0.7) {
+                [[0, 1.5, 2.5, 5, 3, 0.15], [2.5, 1.5, 0, 0.15, 3, 5]].forEach((c, i) => {
+                    if (seededRand(tx + i + 7, tz + i + 7) > 0.7) {
                         const w = new THREE.Mesh(new THREE.BoxGeometry(c[3], c[4], c[5]), wallMat);
                         w.position.set(c[0], c[1], c[2]); group.add(w);
                         walls.push(new THREE.Box3().setFromObject(w).translate(new THREE.Vector3(tx*TILE_SIZE, 0, tz*TILE_SIZE)));
@@ -111,8 +87,9 @@
             const px = Math.round(player.pos.x / TILE_SIZE), pz = Math.round(player.pos.z / TILE_SIZE);
             for (let x = px-VIEW_DIST; x <= px+VIEW_DIST; x++) {
                 for (let z = pz-VIEW_DIST; z <= pz+VIEW_DIST; z++) {
-                    const k = `${x},${z}`;
-                    if (!mapData.has(k)) { const t = createTile(x, z); mapData.set(k, t); scene.add(t.mesh); }
+                    if (!mapData.has(`${x},${z}`)) {
+                        const t = createTile(x, z); mapData.set(`${x},${z}`, t); scene.add(t.mesh);
+                    }
                 }
             }
         }
@@ -121,33 +98,19 @@
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
 
-            // 移動計算
-            let mx = (keys['d']?1:0) - (keys['a']?1:0) + input.moveX;
-            let mz = (keys['s']?1:0) - (keys['w']?1:0) + input.moveY;
-            
-            const isSprinting = keys['shift'] && player.stamina > 0;
-            player.stamina += isSprinting ? -0.8 : 0.5;
-            player.stamina = Math.max(0, Math.min(100, player.stamina));
+            // Movement & Stamina
+            let mx = (keys['d']?1:0) - (keys['a']?1:0);
+            let mz = (keys['s']?1:0) - (keys['w']?1:0);
+            const isSprinting = keys['shift'] && player.stamina > 0 && (mx||mz);
+            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -0.7 : 0.4)));
             document.getElementById('stamina-fill').style.width = player.stamina + '%';
-
-            // --- リーン計算ロジック ---
-            let targetLean = 0;
-            if (keys['q']) targetLean = 1;      // 左にリーン
-            else if (keys['e']) targetLean = -1; // 右にリーン
-
-            // リーンの横移動（X Offset）と回転（Roll Z）を滑らかに変化させる
-            player.leanOffset += (targetLean * 0.6 - player.leanOffset) * 0.2; // 最大0.6m横にずれる
-            player.leanRoll += (targetLean * 0.25 - player.leanRoll) * 0.2;     // 最大約14度傾く（0.25ラジアン）
 
             if (mx !== 0 || mz !== 0) {
                 const speed = isSprinting ? 0.12 : 0.06;
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                
                 ['x', 'z'].forEach(axis => {
                     const next = player.pos[axis] + dir[axis] * speed;
-                    const testBox = new THREE.Box3().setFromCenterAndSize(
-                        player.pos.clone().setComponent(axis==='x'?0:2, next), new THREE.Vector3(0.6, 1, 0.6)
-                    );
+                    const testBox = new THREE.Box3().setFromCenterAndSize(player.pos.clone().setComponent(axis==='x'?0:2, next), new THREE.Vector3(0.6, 1, 0.6));
                     let hit = false;
                     const tx = Math.round(player.pos.x / TILE_SIZE), tz = Math.round(player.pos.z / TILE_SIZE);
                     for(let x=-1; x<=1; x++) for(let z=-1; z<=1; z++) {
@@ -159,14 +122,20 @@
                 player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
             }
 
-            // カメラの位置設定：プレイヤー位置 + リーンの横ずれを適用
-            // リーンのずれは、現在のプレイヤーの向き（yaw）に対して横方向（right）に適用する
-            const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            camera.position.copy(player.pos).add(right.multiplyScalar(player.leanOffset));
+            // --- LEAN LOGIC (FIXED) ---
+            const targetLean = (keys['q'] ? 1 : 0) - (keys['e'] ? 1 : 0);
+            player.lean += (targetLean - player.lean) * 0.15; // Smooth transition
+
+            // 1. Position Offset (サイドにずらす)
+            // プレイヤーの右方向ベクトルを取得し、その逆方向または順方向にずらす
+            const leanDist = player.lean * 0.8; // ずらす距離（0.8m）
+            const leanOffset = new THREE.Vector3(leanDist, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
             
-            // カメラの回転設定：pitch (X), yaw (Y) + リーンのroll (Z)を適用
-            // 順序が'YXZ'なので、まずY(左右)、次にX(上下)、最後にZ(首傾げ)が適用される
-            camera.rotation.set(player.rot.x, player.rot.y, player.leanRoll);
+            camera.position.copy(player.pos).add(leanOffset);
+            
+            // 2. Rotation (首を傾ける)
+            // Z軸回転を適用（0.3ラジアン = 約17度）
+            camera.rotation.set(player.rot.x, player.rot.y, player.lean * 0.3);
             
             updateMap();
             renderer.render(scene, camera);
