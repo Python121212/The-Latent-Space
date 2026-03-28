@@ -60,6 +60,7 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
+        // --- オーディオシステム ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
 
@@ -67,22 +68,35 @@
         const footstepSound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
         
+        // 環境音の設定
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
-            humSound.setVolume(0.3);
+            humSound.setVolume(0.5); // 音量を少し上げました
+            // ロード完了時にすでにゲーム開始していたら再生
+            if (document.pointerLockElement === renderer.domElement && !humSound.isPlaying) {
+                humSound.play();
+            }
         });
 
+        // 足音の設定
         audioLoader.load('footstep.mp3', (buffer) => {
             footstepSound.setBuffer(buffer);
-            footstepSound.setVolume(0.5);
+            footstepSound.setVolume(0.6);
         });
 
+        // アプリ開始時の処理
         window.startApp = () => {
             renderer.domElement.requestPointerLock();
-            // 環境音を確実に再生開始
-            if (humSound.buffer) {
-                if (!humSound.isPlaying) humSound.play();
+            
+            // ブラウザのオーディオ制限を解除
+            if (listener.context.state === 'suspended') {
+                listener.context.resume();
+            }
+
+            // 環境音再生
+            if (humSound.buffer && !humSound.isPlaying) {
+                humSound.play();
             }
         };
 
@@ -114,7 +128,10 @@
 
         window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key === ' ') doJump(); });
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-        document.addEventListener('pointerlockchange', () => { document.getElementById('lock-overlay').style.display = (document.pointerLockElement === renderer.domElement) ? 'none' : 'flex'; });
+        document.addEventListener('pointerlockchange', () => { 
+            const isLocked = document.pointerLockElement === renderer.domElement;
+            document.getElementById('lock-overlay').style.display = isLocked ? 'none' : 'flex'; 
+        });
         document.addEventListener('mousemove', (e) => { if (document.pointerLockElement === renderer.domElement) { player.rot.y -= e.movementX * 0.002; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002)); } });
 
         let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
@@ -160,7 +177,6 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            const deltaTime = clock.getDelta();
             const elapsedTime = clock.getElapsedTime();
 
             player.pos.y += player.velY;
@@ -202,7 +218,7 @@
                     player.lastStepTime = elapsedTime;
                 }
             } else {
-                // 移動していないときは足音を即座に止める
+                // 停止時は足音を即座に止める
                 if (footstepSound.isPlaying) footstepSound.stop();
             }
 
