@@ -3,53 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Pro Controls</title>
+    <title>The Backrooms - Mobile Optimized</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; image-rendering: pixelated; }
         
-        /* 画面上部のステータス */
-        #stats { position: absolute; top: 20px; left: 20px; color: #eeeeaa; font-size: 14px; pointer-events: none; z-index: 100; text-shadow: 2px 2px #000; }
-        #stamina-bar { width: 150px; height: 8px; background: rgba(0,0,0,0.7); border: 1px solid #555; margin-top: 8px; overflow: hidden; }
-        #stamina-fill { width: 100%; height: 100%; background: #ffffaa; transition: width 0.1s linear; }
+        /* ステータスバー（左上） */
+        #stats { position: absolute; top: 15px; left: 15px; color: #fff; font-size: 12px; pointer-events: none; z-index: 100; }
+        #stamina-bar { width: 100px; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; border-radius: 2px; }
+        #stamina-fill { width: 100%; height: 100%; background: #ffeb3b; border-radius: 2px; }
 
-        /* スタート案内（もっと目立たなく、すぐ消える） */
+        /* スタートメッセージ */
         #lock-msg { 
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); 
-            color: #fff; text-align: center; pointer-events: none; z-index: 50;
-            background: rgba(0,0,0,0.6); padding: 15px 30px; border: 1px solid #444;
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.7); color: #fff; z-index: 300; transition: opacity 0.5s;
         }
 
-        /* --- 操作系（ここを使いやすく改善） --- */
-        #controls-layer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
+        /* --- モバイル用UIレイアウト --- */
+        #mobile-ui { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
         
-        /* 左：ジョイスティック（少し大きく、位置を調整） */
-        #joystick-base { position: absolute; bottom: 60px; left: 60px; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; pointer-events: auto; }
-        #joystick-stick { position: absolute; top: 30px; left: 30px; width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 50%; pointer-events: none; }
+        /* 左下：ジョイスティック */
+        .joy-container { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; pointer-events: auto; }
+        #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.08); border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+        #joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
 
-        /* 右：アクションボタン（押しやすさ優先） */
-        .btn-group { position: absolute; bottom: 40px; right: 40px; display: grid; grid-template-areas: "jump jump" "q e" "run run"; gap: 15px; pointer-events: auto; }
+        /* 右下：扇形アクションボタン */
+        .action-group { position: absolute; bottom: 30px; right: 30px; width: 220px; height: 220px; pointer-events: none; }
         .btn { 
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; 
-            display: flex; align-items: center; justify-content: center; font-weight: bold;
-            -webkit-tap-highlight-color: transparent; border-radius: 12px;
+            position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff;
+            border-radius: 50%; font-weight: bold; font-size: 14px; backdrop-filter: blur(4px);
+            -webkit-tap-highlight-color: transparent; transition: background 0.1s, transform 0.1s;
         }
-        .btn:active { background: rgba(255,255,255,0.4); transform: scale(0.95); }
+        .btn:active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
         
-        #btn-jump { grid-area: jump; height: 70px; font-size: 18px; background: rgba(255,255,255,0.15); }
-        #btn-q { grid-area: q; width: 75px; height: 75px; border-radius: 50%; }
-        #btn-e { grid-area: e; width: 75px; height: 75px; border-radius: 50%; }
-        #btn-shift { grid-area: run; height: 60px; font-size: 16px; letter-spacing: 2px; }
+        /* 各ボタンの配置（扇形） */
+        #btn-jump { bottom: 85px; right: 85px; width: 85px; height: 85px; font-size: 16px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); }
+        #btn-q { bottom: 140px; right: 0; width: 65px; height: 65px; }
+        #btn-e { bottom: 0; right: 140px; width: 65px; height: 65px; }
+        #btn-shift { bottom: 0; right: 0; width: 80px; height: 80px; border-radius: 20px; font-size: 13px; }
 
     </style>
 </head>
 <body>
-    <div id="stats">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="lock-msg">TOUCH SCREEN TO START</div>
+    <div id="lock-msg" onclick="this.style.opacity='0';setTimeout(()=>this.style.display='none',500)">TOUCH TO START</div>
+    <div id="stats">LVL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
 
-    <div id="controls-layer">
-        <div id="joystick-base"><div id="joystick-stick"></div></div>
-        <div class="btn-group">
+    <div id="mobile-ui">
+        <div class="joy-container">
+            <div id="joystick-base"><div id="joystick-stick"></div></div>
+        </div>
+        <div class="action-group">
             <div id="btn-jump" class="btn">JUMP</div>
             <div id="btn-q" class="btn">Q</div>
             <div id="btn-e" class="btn">E</div>
@@ -82,29 +86,13 @@
         };
         const keys = {};
 
-        // --- UI非表示処理 ---
-        const msg = document.getElementById('lock-msg');
-        const hideUI = () => { msg.style.display = 'none'; };
-
-        // --- 入力制御 (マルチタッチ) ---
+        // --- モバイル入力 (独立マルチタッチ) ---
         const setupBtn = (id, key, callback) => {
             const el = document.getElementById(id);
-            const start = (e) => { e.preventDefault(); keys[key] = true; hideUI(); if(callback) callback(); };
-            const end = (e) => { e.preventDefault(); keys[key] = false; };
-            el.addEventListener('touchstart', start); el.addEventListener('touchend', end);
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; if(callback) callback(); }, { passive: false });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; }, { passive: false });
         };
         setupBtn('btn-q', 'q'); setupBtn('btn-e', 'e'); setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', 'space', jump);
-
-        // PC
-        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.code === 'Space') jump(); hideUI(); });
-        window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-        document.addEventListener('mousedown', () => { if(!document.pointerLockElement) renderer.domElement.requestPointerLock(); hideUI(); });
-        document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.002;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
-            }
-        });
 
         // スティック & 視点
         let jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
@@ -115,23 +103,23 @@
             updateJoystick(e.changedTouches[0]);
         }, { passive: false });
 
+        let lookId = null, lX, lY;
+        renderer.domElement.addEventListener('touchstart', e => {
+            for(let t of e.changedTouches) {
+                if(t.pageX > window.innerWidth / 2 && lookId === null) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; }
+            }
+        });
+
         window.addEventListener('touchmove', e => {
             for(let t of e.changedTouches) {
                 if(jActive && t.identifier === jTouchId) { updateJoystick(t); e.preventDefault(); }
                 if(t.identifier === lookId) {
-                    player.rot.y -= (t.pageX - lX) * 0.007;
-                    player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.pageY - lY) * 0.007));
+                    player.rot.y -= (t.pageX - lX) * 0.006;
+                    player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - (t.pageY - lY) * 0.006));
                     lX = t.pageX; lY = t.pageY;
                 }
             }
         }, { passive: false });
-
-        let lookId = null, lX, lY;
-        renderer.domElement.addEventListener('touchstart', e => {
-            for(let t of e.changedTouches) {
-                if(t.pageX > window.innerWidth / 3 && lookId === null) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; }
-            }
-        });
 
         window.addEventListener('touchend', e => {
             for(let t of e.changedTouches) {
@@ -150,11 +138,22 @@
 
         function jump() { if(player.isGrounded) { player.velY = 0.13; player.isGrounded = false; } }
 
-        // --- マップシステム ---
+        // PCサポート
+        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.code === 'Space') jump(); });
+        window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+        document.addEventListener('mousedown', () => { if(!document.pointerLockElement) renderer.domElement.requestPointerLock(); });
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === renderer.domElement) {
+                player.rot.y -= e.movementX * 0.002;
+                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
+            }
+        });
+
+        // --- マップ & アニメーション ---
         const mapData = new Map();
         function createTile(tx, tz) {
             const g = new THREE.Group();
-            g.add(new THREE.Mesh(new THREE.PlaneGeometry(5.05,5.05), floorMat).rotateX(-Math.PI/2)); // 隙間防止
+            g.add(new THREE.Mesh(new THREE.PlaneGeometry(5.05,5.05), floorMat).rotateX(-Math.PI/2));
             const c = new THREE.Mesh(new THREE.PlaneGeometry(5,5), floorMat);
             c.rotation.x = Math.PI/2; c.position.y = 3; g.add(c);
             const walls = [];
@@ -172,12 +171,10 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // 重力
             player.pos.y += player.velY;
             if (player.pos.y > 0) { player.velY -= 0.007; player.isGrounded = false; }
             else { player.pos.y = 0; player.velY = 0; player.isGrounded = true; }
 
-            // 移動
             const mx = (keys['d']?1:0) - (keys['a']?1:0) + jInput.x;
             const mz = (keys['s']?1:0) - (keys['w']?1:0) + jInput.z;
             const isMoving = Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05;
@@ -209,14 +206,12 @@
                 if(player.isGrounded) player.bobTimer += player.currentSpeed * 3.5;
             }
 
-            // カメラ制御
             player.lean += (((keys['e']?1:0) - (keys['q']?1:0)) - player.lean) * 0.12;
             const bobY = player.isGrounded ? Math.sin(player.bobTimer)*0.06 : 0;
             camera.position.set(player.pos.x, 1.6 + player.pos.y + bobY, player.pos.z);
             camera.position.add(new THREE.Vector3(player.lean * 0.8, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0)));
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.18);
 
-            // 動的生成
             const ptx = Math.round(player.pos.x/5), ptz = Math.round(player.pos.z/5);
             for(let x=ptx-6; x<=ptx+6; x++) for(let z=ptz-6; z<=ptz+6; z++) {
                 if(!mapData.has(`${x},${z}`)) { const t = createTile(x,z); mapData.set(`${x},${z}`,t); scene.add(t.mesh); }
