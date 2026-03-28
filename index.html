@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lean Fixed</title>
+    <title>The Backrooms - Lean Inverted</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">Q / E to Lean (Peek around corners)</div>
+    <div id="msg">Q: Lean Right / E: Lean Left</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -44,11 +44,10 @@
             pos: new THREE.Vector3(0, 1.5, 0), 
             rot: { x: 0, y: 0 },
             stamina: 100,
-            lean: 0 // -1 (Right) to 1 (Left)
+            lean: 0 // 正の値で右、負の値で左
         };
         const keys = {};
 
-        // PC Lock
         document.addEventListener('mousedown', () => renderer.domElement.requestPointerLock());
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
@@ -98,7 +97,6 @@
             requestAnimationFrame(animate);
             const time = performance.now() * 0.001;
 
-            // Movement & Stamina
             let mx = (keys['d']?1:0) - (keys['a']?1:0);
             let mz = (keys['s']?1:0) - (keys['w']?1:0);
             const isSprinting = keys['shift'] && player.stamina > 0 && (mx||mz);
@@ -122,20 +120,19 @@
                 player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
             }
 
-            // --- LEAN LOGIC (FIXED) ---
+            // --- LEAN INVERTED ---
+            // Qで右(1.0)、Eで左(-1.0)
             const targetLean = (keys['q'] ? 1 : 0) - (keys['e'] ? 1 : 0);
-            player.lean += (targetLean - player.lean) * 0.15; // Smooth transition
+            player.lean += (targetLean - player.lean) * 0.15;
 
-            // 1. Position Offset (サイドにずらす)
-            // プレイヤーの右方向ベクトルを取得し、その逆方向または順方向にずらす
-            const leanDist = player.lean * 0.8; // ずらす距離（0.8m）
+            // 1. 位置のオフセット（右方向にずらす）
+            const leanDist = player.lean * 0.8; 
             const leanOffset = new THREE.Vector3(leanDist, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            
             camera.position.copy(player.pos).add(leanOffset);
             
-            // 2. Rotation (首を傾ける)
-            // Z軸回転を適用（0.3ラジアン = 約17度）
-            camera.rotation.set(player.rot.x, player.rot.y, player.lean * 0.3);
+            // 2. 回転（首を逆方向に傾ける）
+            // leanが正(Q)のとき、視界を右に傾ける
+            camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.25);
             
             updateMap();
             renderer.render(scene, camera);
