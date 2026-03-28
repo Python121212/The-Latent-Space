@@ -3,80 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Immersive Edition</title>
+    <title>The Backrooms - Loading Optimized</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
         canvas { display: block; }
         
-        /* --- ホーム画面 (アップグレード版) --- */
-        .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 1s ease; }
+        /* --- ローディング画面 --- */
+        #loading-screen {
+            position: fixed; inset: 0; background: #000; color: #dbd4a2;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000;
+        }
+        .loader {
+            width: 40px; height: 40px; border: 2px solid #333; border-top-color: #dbd4a2;
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- ホーム画面 --- */
+        .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.8s ease; }
         #lock-overlay { 
             background: radial-gradient(circle, #2a2a1a 0%, #000 100%); 
-            color: #dbd4a2; 
-            cursor: pointer;
-            flex-direction: column;
-            border: 20px solid #000;
+            color: #dbd4a2; cursor: pointer; flex-direction: column; border: 20px solid #000;
+            display: none; /* 初期状態は非表示 */
         }
         
-        /* VHS風のノイズアニメーション */
         #lock-overlay::before {
-            content: " ";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-            z-index: 10000;
+            content: " "; position: absolute; inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+            background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
 
-        .title-container { text-align: center; z-index: 10; }
-        .main-title { 
-            font-size: 48px; 
-            font-weight: 900; 
-            letter-spacing: 12px; 
-            margin: 0; 
-            color: #eee5a1;
-            text-shadow: 3px 3px 0px #3d3d29, 0 0 20px rgba(219,212,162,0.4);
-        }
-        .sub-title { font-size: 14px; letter-spacing: 4px; color: #888; margin-top: 10px; }
-        .prompt { margin-top: 50px; font-size: 18px; animation: blink 1.5s infinite; color: #dbd4a2; }
-
+        .title-container { text-align: center; }
+        .main-title { font-size: 48px; font-weight: 900; letter-spacing: 12px; margin: 0; color: #eee5a1; text-shadow: 3px 3px 0px #3d3d29; }
+        .prompt { margin-top: 50px; font-size: 18px; animation: blink 1.5s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
         /* --- ポーズメニュー --- */
         #pause-menu { background: rgba(0,0,0,0.9); color: #dbd4a2; display: none; flex-direction: column; }
-        .menu-content { width: 300px; padding: 30px; text-align: center; background: #1a1a0d; border: 1px solid #333; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
-        .menu-title { font-size: 28px; margin-bottom: 30px; letter-spacing: 8px; border-bottom: 1px solid #333; padding-bottom: 15px; }
-        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; background: #2a2a1a; border: 1px solid #444; color: #dbd4a2; cursor: pointer; font-family: inherit; font-weight: bold; transition: background 0.2s; }
-        .menu-btn:active { background: #3d3d29; }
+        .menu-content { width: 300px; padding: 30px; text-align: center; background: #1a1a0d; border: 1px solid #333; }
+        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; background: #2a2a1a; border: 1px solid #444; color: #dbd4a2; cursor: pointer; font-family: inherit; }
         
         .setting-row { margin: 20px 0; font-size: 13px; text-align: left; color: #888; }
-        input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 8px; cursor: pointer; }
+        input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 8px; }
 
-        /* UI要素 */
-        #stats { position: absolute; top: 20px; left: 20px; color: #dbd4a2; font-size: 14px; pointer-events: none; z-index: 100; text-shadow: 1px 1px 2px #000; }
+        #stats { position: absolute; top: 20px; left: 20px; color: #dbd4a2; font-size: 14px; pointer-events: none; z-index: 100; }
         #stamina-bar { width: 120px; height: 3px; background: rgba(255,255,255,0.1); margin-top: 8px; }
-        #stamina-fill { width: 100%; height: 100%; background: #dbd4a2; box-shadow: 0 0 5px #dbd4a2; }
-        #menu-open-btn { position: absolute; top: 20px; right: 20px; padding: 10px 15px; color: #dbd4a2; background: rgba(0,0,0,0.3); border: 1px solid rgba(219,212,162,0.3); z-index: 300; cursor: pointer; }
+        #stamina-fill { width: 100%; height: 100%; background: #dbd4a2; }
+        #menu-open-btn { position: absolute; top: 20px; right: 20px; padding: 10px; color: #dbd4a2; background: rgba(0,0,0,0.3); border: 1px solid rgba(219,212,162,0.3); z-index: 300; }
 
-        /* モバイル操作 */
         #mobile-ui { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
         .joy-container { position: absolute; bottom: 50px; left: 50px; width: 130px; height: 130px; pointer-events: auto; }
         #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.03); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); }
         #joystick-stick { width: 55px; height: 55px; background: rgba(219,212,162,0.15); border-radius: 50%; }
         .action-group { position: absolute; bottom: 40px; right: 40px; width: 220px; height: 220px; pointer-events: none; }
         .btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #dbd4a2; border-radius: 50%; font-weight: bold; -webkit-tap-highlight-color: transparent; }
-        #btn-jump { bottom: 90px; right: 90px; width: 85px; height: 85px; font-size: 14px; }
-        #btn-q { bottom: 150px; right: 0; width: 60px; height: 60px; font-size: 12px; }
-        #btn-e { bottom: 0; right: 150px; width: 60px; height: 60px; font-size: 12px; }
-        #btn-shift { bottom: 0; right: 0; width: 85px; height: 85px; border-radius: 25px; font-size: 14px; }
+        #btn-jump { bottom: 90px; right: 90px; width: 85px; height: 85px; }
+        #btn-shift { bottom: 0; right: 0; width: 85px; height: 85px; border-radius: 25px; }
     </style>
 </head>
 <body>
+    <!-- ローディング -->
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div id="load-text">INITIALIZING...</div>
+    </div>
+
     <!-- ホーム画面 -->
     <div id="lock-overlay" class="overlay" onclick="startApp()">
         <div class="title-container">
-            <p class="sub-title">FOUND FOOTAGE</p>
             <h1 class="main-title">THE<br>BACKROOMS</h1>
             <p class="prompt">TAP TO NO-CLIP</p>
         </div>
@@ -102,8 +96,6 @@
         <div class="joy-container"><div id="joystick-base"><div id="joystick-stick"></div></div></div>
         <div class="action-group">
             <div id="btn-jump" class="btn">JUMP</div>
-            <div id="btn-q" class="btn">Q</div>
-            <div id="btn-e" class="btn">E</div>
             <div id="btn-shift" class="btn">RUN</div>
         </div>
     </div>
@@ -138,17 +130,29 @@
         
         let isPaused = false;
         let isGameStarted = false;
+        let humLoaded = false;
+        let footLoaded = false;
+
+        function checkLoading() {
+            if (humLoaded && footLoaded) {
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('lock-overlay').style.display = 'flex';
+            }
+        }
 
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
             humSound.setVolume(0.5);
-            if (isGameStarted) humSound.play();
+            humLoaded = true;
+            checkLoading();
         });
 
         audioLoader.load('footstep.mp3', (buffer) => {
             footstepSound.setBuffer(buffer);
             footstepSound.setVolume(0.6);
+            footLoaded = true;
+            checkLoading();
         });
 
         function activateAudio() {
@@ -193,7 +197,7 @@
             if(humSound.buffer) humSound.setVolume(val / 100);
         });
 
-        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100, currentSpeed: 0, bobTimer: 0, velY: 0, isGrounded: true, lean: 0, lastStepTime: 0 };
+        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100, currentSpeed: 0, bobTimer: 0, velY: 0, isGrounded: true, lastStepTime: 0 };
         const keys = {};
         const clock = new THREE.Clock();
 
@@ -207,7 +211,7 @@
             el.addEventListener('touchend', e => { e.preventDefault(); keys[key]=false; }, {passive:false});
         };
         const doJump = () => { if(player.isGrounded) player.velY = 0.13; };
-        setupBtn('btn-q', 'q'); setupBtn('btn-e', 'e'); setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', ' ', doJump);
+        setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', ' ', doJump);
 
         window.addEventListener('keydown', e => { 
             if (e.key === 'Escape') toggleMenu();
@@ -323,12 +327,9 @@
                 if (footstepSound.isPlaying) footstepSound.stop();
             }
 
-            player.lean += (((keys['e']?1:0)-(keys['q']?1:0)) - player.lean) * 0.1;
             camera.position.set(player.pos.x, 1.6 + player.pos.y + Math.sin(player.bobTimer)*0.05, player.pos.z);
-            camera.position.add(new THREE.Vector3(player.lean * 0.6, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0)));
-            camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.15);
+            camera.rotation.set(player.rot.x, player.rot.y, 0);
             playerLight.position.set(player.pos.x, 2.2, player.pos.z);
-            playerLight.intensity = 1.5 + Math.sin(Date.now()*0.01)*0.1;
 
             const curTX = Math.round(player.pos.x / 5), curTZ = Math.round(player.pos.z / 5);
             for (let x = curTX - 5; x <= curTX + 5; x++) for (let z = curTZ - 5; z <= curTZ + 5; z++) {
