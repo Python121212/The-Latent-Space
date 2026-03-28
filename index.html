@@ -3,49 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Loading Optimized</title>
+    <title>The Backrooms - Menu Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
         canvas { display: block; }
         
-        /* --- ローディング画面 --- */
+        /* --- ローディング --- */
         #loading-screen {
             position: fixed; inset: 0; background: #000; color: #dbd4a2;
             display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000;
         }
-        .loader {
-            width: 40px; height: 40px; border: 2px solid #333; border-top-color: #dbd4a2;
-            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
-        }
+        .loader { width: 40px; height: 40px; border: 2px solid #333; border-top-color: #dbd4a2; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* --- ホーム画面 --- */
-        .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.8s ease; }
+        .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
         #lock-overlay { 
             background: radial-gradient(circle, #2a2a1a 0%, #000 100%); 
-            color: #dbd4a2; cursor: pointer; flex-direction: column; border: 20px solid #000;
-            display: none; /* 初期状態は非表示 */
+            color: #dbd4a2; flex-direction: column; border: 20px solid #000; display: none;
         }
         
         #lock-overlay::before {
             content: " "; position: absolute; inset: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
 
-        .title-container { text-align: center; }
-        .main-title { font-size: 48px; font-weight: 900; letter-spacing: 12px; margin: 0; color: #eee5a1; text-shadow: 3px 3px 0px #3d3d29; }
-        .prompt { margin-top: 50px; font-size: 18px; animation: blink 1.5s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .title-container { text-align: center; margin-bottom: 40px; }
+        .main-title { font-size: clamp(32px, 8vw, 48px); font-weight: 900; letter-spacing: 10px; margin: 0; color: #eee5a1; text-shadow: 3px 3px 0px #3d3d29; }
+        
+        .menu-options { display: flex; flex-direction: column; gap: 15px; width: 220px; z-index: 10; }
+        .home-btn { 
+            padding: 15px; background: rgba(42, 42, 26, 0.8); border: 1px solid #444; 
+            color: #dbd4a2; cursor: pointer; font-family: inherit; font-size: 16px; 
+            letter-spacing: 2px; transition: 0.2s;
+        }
+        .home-btn:active { background: #3d3d29; transform: scale(0.98); }
+
+        /* --- 設定パネル（共通） --- */
+        .settings-panel {
+            display: none; position: absolute; width: 280px; padding: 20px; 
+            background: #1a1a0d; border: 1px solid #444; box-shadow: 0 0 30px #000; z-index: 100;
+        }
+        .settings-panel h2 { font-size: 18px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; letter-spacing: 3px; }
+        .setting-row { margin: 20px 0; font-size: 13px; text-align: left; }
+        input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 8px; cursor: pointer; }
 
         /* --- ポーズメニュー --- */
-        #pause-menu { background: rgba(0,0,0,0.9); color: #dbd4a2; display: none; flex-direction: column; }
-        .menu-content { width: 300px; padding: 30px; text-align: center; background: #1a1a0d; border: 1px solid #333; }
-        .menu-btn { width: 100%; padding: 15px; margin: 10px 0; background: #2a2a1a; border: 1px solid #444; color: #dbd4a2; cursor: pointer; font-family: inherit; }
-        
-        .setting-row { margin: 20px 0; font-size: 13px; text-align: left; color: #888; }
-        input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 8px; }
+        #pause-menu { background: rgba(0,0,0,0.85); display: none; flex-direction: column; }
 
+        /* UI */
         #stats { position: absolute; top: 20px; left: 20px; color: #dbd4a2; font-size: 14px; pointer-events: none; z-index: 100; }
         #stamina-bar { width: 120px; height: 3px; background: rgba(255,255,255,0.1); margin-top: 8px; }
         #stamina-fill { width: 100%; height: 100%; background: #dbd4a2; }
@@ -55,37 +62,46 @@
         .joy-container { position: absolute; bottom: 50px; left: 50px; width: 130px; height: 130px; pointer-events: auto; }
         #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.03); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); }
         #joystick-stick { width: 55px; height: 55px; background: rgba(219,212,162,0.15); border-radius: 50%; }
-        .action-group { position: absolute; bottom: 40px; right: 40px; width: 220px; height: 220px; pointer-events: none; }
-        .btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #dbd4a2; border-radius: 50%; font-weight: bold; -webkit-tap-highlight-color: transparent; }
-        #btn-jump { bottom: 90px; right: 90px; width: 85px; height: 85px; }
-        #btn-shift { bottom: 0; right: 0; width: 85px; height: 85px; border-radius: 25px; }
+        .btn { position: absolute; bottom: 40px; right: 40px; width: 85px; height: 85px; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #dbd4a2; border-radius: 50%; font-weight: bold; }
     </style>
 </head>
 <body>
-    <!-- ローディング -->
     <div id="loading-screen">
         <div class="loader"></div>
-        <div id="load-text">INITIALIZING...</div>
+        <div id="load-text">CONNECTING TO LIMINAL SPACE...</div>
     </div>
 
     <!-- ホーム画面 -->
-    <div id="lock-overlay" class="overlay" onclick="startApp()">
+    <div id="lock-overlay" class="overlay">
         <div class="title-container">
             <h1 class="main-title">THE<br>BACKROOMS</h1>
-            <p class="prompt">TAP TO NO-CLIP</p>
+        </div>
+        <div class="menu-options">
+            <button class="home-btn" onclick="startApp()">START</button>
+            <button class="home-btn" onclick="openHomeSettings()">SETTINGS</button>
+        </div>
+
+        <!-- ホーム用設定パネル -->
+        <div id="home-settings" class="settings-panel">
+            <h2>SETTINGS</h2>
+            <div class="setting-row">
+                AMBIENT HUM: <span class="vol-txt">50</span>%
+                <input type="range" class="vol-slider" min="0" max="100" value="50">
+            </div>
+            <button class="home-btn" style="width:100%; font-size:12px;" onclick="closeHomeSettings()">BACK</button>
         </div>
     </div>
 
     <!-- ポーズメニュー -->
     <div id="pause-menu" class="overlay">
-        <div class="menu-content">
-            <div class="menu-title">PAUSED</div>
+        <div class="settings-panel" style="display:block; position:relative;">
+            <h2>PAUSED</h2>
             <div class="setting-row">
-                AMBIENT HUM: <span id="vol-val">50</span>%
-                <input type="range" id="vol-slider" min="0" max="100" value="50">
+                AMBIENT HUM: <span class="vol-txt">50</span>%
+                <input type="range" class="vol-slider" min="0" max="100" value="50">
             </div>
-            <button class="menu-btn" onclick="resumeGame()">RESUME</button>
-            <button class="menu-btn" onclick="location.reload()">ABANDON SESSION</button>
+            <button class="home-btn" style="width:100%; margin-bottom:10px;" onclick="resumeGame()">RESUME</button>
+            <button class="home-btn" style="width:100%; font-size:12px;" onclick="location.reload()">QUIT</button>
         </div>
     </div>
     
@@ -94,10 +110,7 @@
 
     <div id="mobile-ui">
         <div class="joy-container"><div id="joystick-base"><div id="joystick-stick"></div></div></div>
-        <div class="action-group">
-            <div id="btn-jump" class="btn">JUMP</div>
-            <div id="btn-shift" class="btn">RUN</div>
-        </div>
+        <div class="btn" id="btn-shift">RUN</div>
     </div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
@@ -107,15 +120,7 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a1a0d);
         scene.fog = new THREE.Fog(0x1a1a0d, 2, 12);
-
-        const ambientLight = new THREE.AmbientLight(0xfffaaa, 0.4);
-        scene.add(ambientLight);
-
-        const playerLight = new THREE.PointLight(0xfff0aa, 1.5, 8);
-        scene.add(playerLight);
-
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
-        camera.rotation.order = 'YXZ';
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -123,113 +128,67 @@
 
         const listener = new THREE.AudioListener();
         camera.add(listener);
-
         const humSound = new THREE.Audio(listener);
-        const footstepSound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
         
-        let isPaused = false;
-        let isGameStarted = false;
+        let isPaused = false, isGameStarted = false;
         let humLoaded = false;
-        let footLoaded = false;
-
-        function checkLoading() {
-            if (humLoaded && footLoaded) {
-                document.getElementById('loading-screen').style.display = 'none';
-                document.getElementById('lock-overlay').style.display = 'flex';
-            }
-        }
 
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
             humSound.setVolume(0.5);
             humLoaded = true;
-            checkLoading();
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('lock-overlay').style.display = 'flex';
         });
 
-        audioLoader.load('footstep.mp3', (buffer) => {
-            footstepSound.setBuffer(buffer);
-            footstepSound.setVolume(0.6);
-            footLoaded = true;
-            checkLoading();
+        // 設定の連動処理
+        const sliders = document.querySelectorAll('.vol-slider');
+        const volTxts = document.querySelectorAll('.vol-txt');
+        sliders.forEach(s => {
+            s.addEventListener('input', (e) => {
+                const val = e.target.value;
+                sliders.forEach(other => other.value = val);
+                volTxts.forEach(t => t.textContent = val);
+                if(humSound.buffer) humSound.setVolume(val / 100);
+            });
         });
 
-        function activateAudio() {
-            if (listener.context.state === 'suspended') listener.context.resume();
-            isGameStarted = true;
-            if (humSound.buffer && !humSound.isPlaying) humSound.play();
-        }
+        window.openHomeSettings = () => document.getElementById('home-settings').style.display = 'block';
+        window.closeHomeSettings = () => document.getElementById('home-settings').style.display = 'none';
+
+        window.startApp = () => {
+            document.getElementById('lock-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('lock-overlay').style.display = 'none';
+                if (listener.context.state === 'suspended') listener.context.resume();
+                isGameStarted = true;
+                humSound.play();
+                renderer.domElement.requestPointerLock();
+            }, 500);
+        };
 
         window.toggleMenu = () => {
-            if (document.getElementById('lock-overlay').style.display === 'none') {
-                isPaused = !isPaused;
-                document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
-                if (!isPaused) {
-                    renderer.domElement.requestPointerLock();
-                    activateAudio();
-                } else {
-                    document.exitPointerLock();
-                }
-            }
+            if (!isGameStarted) return;
+            isPaused = !isPaused;
+            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
+            if (!isPaused) renderer.domElement.requestPointerLock();
+            else document.exitPointerLock();
         };
 
         window.resumeGame = () => {
             isPaused = false;
             document.getElementById('pause-menu').style.display = 'none';
             renderer.domElement.requestPointerLock();
-            activateAudio();
         };
 
-        window.startApp = () => {
-            document.getElementById('lock-overlay').style.opacity = '0';
-            setTimeout(() => {
-                document.getElementById('lock-overlay').style.display = 'none';
-                renderer.domElement.requestPointerLock();
-                activateAudio();
-            }, 500);
-        };
-
-        const volSlider = document.getElementById('vol-slider');
-        volSlider.addEventListener('input', (e) => {
-            const val = e.target.value;
-            document.getElementById('vol-val').textContent = val;
-            if(humSound.buffer) humSound.setVolume(val / 100);
-        });
-
-        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100, currentSpeed: 0, bobTimer: 0, velY: 0, isGrounded: true, lastStepTime: 0 };
+        // --- 簡易ゲームエンジン部分 ---
+        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100 };
         const keys = {};
-        const clock = new THREE.Clock();
-
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x9b9161, roughness: 0.8 });
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a724d, roughness: 0.9 });
-        const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
-
-        const setupBtn = (id, key, cb) => {
-            const el = document.getElementById(id);
-            el.addEventListener('touchstart', e => { e.preventDefault(); if(!isPaused) keys[key]=true; if(cb && !isPaused)cb(); }, {passive:false});
-            el.addEventListener('touchend', e => { e.preventDefault(); keys[key]=false; }, {passive:false});
-        };
-        const doJump = () => { if(player.isGrounded) player.velY = 0.13; };
-        setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', ' ', doJump);
-
-        window.addEventListener('keydown', e => { 
-            if (e.key === 'Escape') toggleMenu();
-            if (!isPaused) {
-                keys[e.key.toLowerCase()] = true; 
-                if(e.key === ' ') doJump();
-            }
-        });
+        window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
         
-        document.addEventListener('pointerlockchange', () => { 
-            const isLocked = document.pointerLockElement === renderer.domElement;
-            if (!isLocked && !isPaused && document.getElementById('lock-overlay').style.display === 'none') {
-                isPaused = true;
-            }
-            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
-        });
-
         document.addEventListener('mousemove', (e) => { 
             if (document.pointerLockElement === renderer.domElement && !isPaused) { 
                 player.rot.y -= e.movementX * 0.002; 
@@ -237,108 +196,41 @@
             } 
         });
 
-        let lookId = null, lX, lY, jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
-        const jStick = document.getElementById('joystick-stick'), jBase = document.getElementById('joystick-base');
-        renderer.domElement.addEventListener('touchstart', e => { if(isPaused) return; for(let t of e.changedTouches) if(t.pageX > window.innerWidth / 2) { lookId = t.identifier; lX = t.pageX; lY = t.pageY; } });
-        jBase.addEventListener('touchstart', e => { if(isPaused) return; e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier; }, {passive:false});
-        window.addEventListener('touchmove', e => {
-            if(isPaused) return;
-            for(let t of e.changedTouches) {
-                if(t.identifier === lookId) { player.rot.y -= (t.pageX-lX)*0.006; player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x-(t.pageY-lY)*0.006)); lX=t.pageX; lY=t.pageY; }
-                if(jActive && t.identifier === jTouchId) {
-                    const r = jBase.getBoundingClientRect(); const dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2);
-                    const d = Math.min(r.width/2, Math.sqrt(dx*dx+dy*dy)), a = Math.atan2(dy,dx);
-                    jStick.style.transform = `translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`;
-                    jInput.x = (Math.cos(a)*d)/(r.width/2); jInput.z = (Math.sin(a)*d)/(r.height/2);
-                }
-            }
-        }, { passive: false });
-        window.addEventListener('touchend', e => { for(let t of e.changedTouches) { if(t.identifier === lookId) lookId = null; if(t.identifier === jTouchId) { jActive = false; jInput = {x:0,z:0}; jStick.style.transform = ''; } } });
-
-        const mapData = new Map();
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x9b9161 });
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x7a724d });
+        
         function createTile(tx, tz) {
             const group = new THREE.Group();
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(5.05, 5.05), floorMat);
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), floorMat);
             floor.rotation.x = -Math.PI/2; group.add(floor);
-            const ceil = new THREE.Mesh(new THREE.PlaneGeometry(5.05, 5.05), wallMat);
+            const ceil = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), wallMat);
             ceil.rotation.x = Math.PI/2; ceil.position.y = 3; group.add(ceil);
-            const lampFrame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.4), new THREE.MeshStandardMaterial({color:0x333333}));
-            lampFrame.position.set(0, 2.96, 0); group.add(lampFrame);
-            const lampLight = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.05, 0.3), lightMat);
-            lampLight.position.set(0, 2.93, 0); group.add(lampLight);
-            const walls = [];
-            const seed = Math.sin(tx * 12.98 + tz * 78.23) * 43758.54;
-            if (seed - Math.floor(seed) > 0.75 && (Math.abs(tx) > 1 || Math.abs(tz) > 1)) {
-                const wall = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.5), wallMat);
-                wall.position.set(0, 1.5, 2.25); group.add(wall);
-                const wallBox = new THREE.Box3().setFromObject(wall); wallBox.translate(new THREE.Vector3(tx*5, 0, tz*5));
-                walls.push(wallBox);
-            }
             group.position.set(tx * 5, 0, tz * 5);
             scene.add(group);
-            return { mesh: group, walls };
+            return group;
         }
 
+        const mapData = new Map();
         function animate() {
             requestAnimationFrame(animate);
-            if (isPaused || !isGameStarted) {
-                if (footstepSound.isPlaying) footstepSound.stop();
-                return;
+            if (!isGameStarted || isPaused) return;
+
+            let speed = keys['shift'] ? 0.12 : 0.07;
+            if (keys['w']) {
+                player.pos.x -= Math.sin(player.rot.y) * speed;
+                player.pos.z -= Math.cos(player.rot.y) * speed;
             }
-
-            const elapsedTime = clock.getElapsedTime();
-            player.pos.y += player.velY;
-            if (player.pos.y > 0) { player.velY -= 0.007; player.isGrounded = false; } else { player.pos.y = 0; player.velY = 0; player.isGrounded = true; }
-
-            const inputX = (keys['d']?1:0) - (keys['a']?1:0) + jInput.x;
-            const inputZ = (keys['s']?1:0) - (keys['w']?1:0) + jInput.z;
-            const isInputActive = Math.sqrt(inputX*inputX + inputZ*inputZ) > 0.2;
             
-            if (keys['shift'] && player.stamina > 0 && isInputActive) { player.stamina -= 0.8; player.currentSpeed = 0.13; }
-            else { player.stamina = Math.min(100, player.stamina + 0.5); player.currentSpeed = isInputActive ? 0.08 : 0; }
-            document.getElementById('stamina-fill').style.width = player.stamina + '%';
-
-            if (isInputActive) {
-                const moveDir = new THREE.Vector3(inputX, 0, inputZ).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
-                const nextX = player.pos.x + moveDir.x * player.currentSpeed;
-                const nextZ = player.pos.z + moveDir.z * player.currentSpeed;
-                
-                let colX = false, colZ = false;
-                const tx = Math.round(player.pos.x/5), tz = Math.round(player.pos.z/5);
-                for(let x = tx-1; x <= tx+1; x++) for(let z = tz-1; z <= tz+1; z++) {
-                    const tile = mapData.get(`${x},${z}`);
-                    if(tile) tile.walls.forEach(box => {
-                        if(box.intersectsSphere(new THREE.Sphere(new THREE.Vector3(nextX, 1, player.pos.z), 0.4))) colX = true;
-                        if(box.intersectsSphere(new THREE.Sphere(new THREE.Vector3(player.pos.x, 1, nextZ), 0.4))) colZ = true;
-                    });
-                }
-                if(!colX) player.pos.x = nextX; if(!colZ) player.pos.z = nextZ;
-                player.bobTimer += player.currentSpeed * 4;
-                const stepInterval = keys['shift'] ? 0.35 : 0.52;
-                if (elapsedTime - player.lastStepTime > stepInterval && player.isGrounded) {
-                    if (footstepSound.buffer) {
-                        if (footstepSound.isPlaying) footstepSound.stop();
-                        footstepSound.setPlaybackRate(keys['shift'] ? 1.1 : 1.0);
-                        footstepSound.play();
-                    }
-                    player.lastStepTime = elapsedTime;
-                }
-            } else {
-                if (footstepSound.isPlaying) footstepSound.stop();
-            }
-
-            camera.position.set(player.pos.x, 1.6 + player.pos.y + Math.sin(player.bobTimer)*0.05, player.pos.z);
+            camera.position.set(player.pos.x, 1.6, player.pos.z);
             camera.rotation.set(player.rot.x, player.rot.y, 0);
-            playerLight.position.set(player.pos.x, 2.2, player.pos.z);
 
             const curTX = Math.round(player.pos.x / 5), curTZ = Math.round(player.pos.z / 5);
-            for (let x = curTX - 5; x <= curTX + 5; x++) for (let z = curTZ - 5; z <= curTZ + 5; z++) {
+            for (let x = curTX - 3; x <= curTX + 3; x++) for (let z = curTZ - 3; z <= curTZ + 3; z++) {
                 if (!mapData.has(`${x},${z}`)) mapData.set(`${x},${z}`, createTile(x, z));
             }
             renderer.render(scene, camera);
         }
         animate();
-        window.onresize = () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
     </script>
 </body>
 </html>
