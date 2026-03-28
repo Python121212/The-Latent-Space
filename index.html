@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Complete Hybrid Fix</title>
+    <title>The Backrooms - Jump Update</title>
     <style>
         body { margin: 0; overflow: hidden; background: #050500; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
@@ -11,26 +11,27 @@
         #stamina-bar { width: 120px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #444; margin-top: 5px; }
         #stamina-fill { width: 100%; height: 100%; background: #eee; }
         
-        /* モバイル操作パネル */
+        /* 操作パネル */
         #joystick-base { position: absolute; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); z-index: 20; }
         #joystick-stick { position: absolute; top: 25px; left: 25px; width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; pointer-events: none; }
         
-        .action-btns { position: absolute; bottom: 40px; right: 30px; display: flex; flex-direction: column; gap: 20px; align-items: flex-end; z-index: 20; }
-        .lean-row { display: flex; gap: 15px; }
-        .btn { width: 65px; height: 65px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .action-btns { position: absolute; bottom: 40px; right: 30px; display: flex; flex-direction: column; gap: 15px; align-items: flex-end; z-index: 20; }
+        .lean-row { display: flex; gap: 10px; }
+        .btn { width: 60px; height: 60px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 12px; user-select: none; -webkit-tap-highlight-color: transparent; }
         .btn:active { background: rgba(255,255,255,0.3); }
-        #btn-shift { width: 90px; height: 70px; border-radius: 15px; background: rgba(255,255,255,0.05); }
+        #btn-shift { width: 80px; height: 60px; border-radius: 12px; background: rgba(255,255,255,0.05); }
+        #btn-jump { width: 70px; height: 70px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3); font-size: 14px; }
 
-        /* PCでのポインターロック中の案内 */
-        #lock-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.5); pointer-events: none; display: block; }
+        #lock-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.5); pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="lock-msg">Click to Start (ESC to Unlock)</div>
+    <div id="lock-msg">Click to Start / Space to Jump</div>
     
     <div id="joystick-base"><div id="joystick-stick"></div></div>
     <div class="action-btns">
+        <div id="btn-jump" class="btn">JUMP</div>
         <div class="lean-row">
             <div id="btn-q" class="btn">Q</div>
             <div id="btn-e" class="btn">E</div>
@@ -43,7 +44,6 @@
         import * as THREE from 'three';
 
         const TILE_SIZE = 5;
-        const VIEW_DIST = 5;
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050500);
         scene.fog = new THREE.Fog(0x050500, 1, 13);
@@ -62,44 +62,37 @@
         const player = { 
             pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 },
             stamina: 100, isExhausted: false,
-            currentSpeed: 0, bobTimer: 0, lean: 0
+            currentSpeed: 0, bobTimer: 0, lean: 0,
+            velY: 0, isGrounded: true
         };
         const keys = {};
 
-        // --- PC 入力（視点移動・ポインターロック） ---
-        const lockMsg = document.getElementById('lock-msg');
-        document.addEventListener('mousedown', () => {
-            if (document.pointerLockElement !== renderer.domElement) {
-                renderer.domElement.requestPointerLock();
-            }
-        });
-
-        document.addEventListener('pointerlockchange', () => {
-            lockMsg.style.display = (document.pointerLockElement === renderer.domElement) ? 'none' : 'block';
-        });
-
+        // --- PC 操作 ---
+        document.addEventListener('mousedown', () => { if(document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+        document.addEventListener('pointerlockchange', () => { document.getElementById('lock-msg').style.display = (document.pointerLockElement === renderer.domElement) ? 'none' : 'block'; });
         document.addEventListener('mousemove', e => {
             if (document.pointerLockElement === renderer.domElement) {
                 player.rot.y -= e.movementX * 0.002;
                 player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
             }
         });
-
-        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keydown', e => { 
+            keys[e.key.toLowerCase()] = true; 
+            if(e.code === 'Space') jump(); // ジャンプ実行
+        });
         window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-        // --- モバイル 入力（Q, E, Shift） ---
-        const bindBtn = (id, key) => {
+        // --- モバイル 操作 ---
+        const bindBtn = (id, key, callback) => {
             const el = document.getElementById(id);
-            el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; if(callback) callback(); });
             el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
         };
         bindBtn('btn-q', 'q'); bindBtn('btn-e', 'e'); bindBtn('btn-shift', 'shift');
+        bindBtn('btn-jump', 'space', jump);
 
-        // --- モバイル スティック・スワイプ視点 ---
         let jActive = false, jInput = { x: 0, z: 0 };
         const jBase = document.getElementById('joystick-base'), jStick = document.getElementById('joystick-stick');
-        
         const handleJ = (e) => {
             if(!jActive) return;
             const t = e.touches ? e.touches[0] : e;
@@ -110,17 +103,12 @@
             jStick.style.transform = `translate(${Math.cos(a)*d}px, ${Math.sin(a)*d}px)`;
             jInput.x = (Math.cos(a)*d)/50; jInput.z = (Math.sin(a)*d)/50;
         };
-
         jBase.addEventListener('touchstart', e => { jActive = true; handleJ(e); });
         window.addEventListener('touchmove', handleJ, {passive:false});
         window.addEventListener('touchend', () => { jActive = false; jStick.style.transform = ''; jInput = {x:0,z:0}; });
 
         let lX, lY;
-        renderer.domElement.addEventListener('touchstart', e => {
-            if(e.touches[0].clientX > window.innerWidth / 2) { 
-                lX = e.touches[0].pageX; lY = e.touches[0].pageY; 
-            }
-        });
+        renderer.domElement.addEventListener('touchstart', e => { if(e.touches[0].clientX > window.innerWidth/2) { lX = e.touches[0].pageX; lY = e.touches[0].pageY; }});
         renderer.domElement.addEventListener('touchmove', e => {
             if(jActive && e.touches.length < 2) return;
             const t = e.touches[e.touches.length-1];
@@ -130,7 +118,15 @@
             lX = t.pageX; lY = t.pageY;
         });
 
-        // --- マップ生成ロジック ---
+        // --- ジャンプ関数 ---
+        function jump() {
+            if (player.isGrounded) {
+                player.velY = 0.12; // 跳躍力
+                player.isGrounded = false;
+            }
+        }
+
+        // --- マップ生成 ---
         const mapData = new Map();
         function createTile(tx, tz) {
             const g = new THREE.Group();
@@ -152,7 +148,18 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // 入力統合
+            // 重力処理
+            player.pos.y += player.velY;
+            if (player.pos.y > 0) {
+                player.velY -= 0.006; // 重力加速度
+                player.isGrounded = false;
+            } else {
+                player.pos.y = 0;
+                player.velY = 0;
+                player.isGrounded = true;
+            }
+
+            // 移動計算
             const mx = (keys['d']?1:0) - (keys['a']?1:0) + jInput.x;
             const mz = (keys['s']?1:0) - (keys['w']?1:0) + jInput.z;
             const isMoving = Math.abs(mx) > 0.1 || Math.abs(mz) > 0.1;
@@ -160,7 +167,7 @@
             if (player.stamina <= 0) player.isExhausted = true;
             if (player.stamina >= 30) player.isExhausted = false;
             const isSprinting = keys['shift'] && !player.isExhausted && isMoving;
-            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -1.2 : 0.6)));
+            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -1.0 : 0.6)));
             document.getElementById('stamina-fill').style.width = player.stamina + '%';
 
             const targetSpeed = isMoving ? (isSprinting ? 0.14 : 0.07) : 0;
@@ -175,30 +182,35 @@
                     for(let x=-1;x<=1;x++) for(let z=-1;z<=1;z++){
                         const t = mapData.get(`${tx+x},${tz+z}`);
                         if(t) t.walls.forEach(w => { 
-                            const pBox = new THREE.Box3().setFromCenterAndSize(player.pos.clone().setComponent(axis==='x'?0:2, next).add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0.6,1.8,0.6));
+                            const pBox = new THREE.Box3().setFromCenterAndSize(
+                                player.pos.clone().setComponent(axis==='x'?0:2, next).add(new THREE.Vector3(0, 1.5, 0)), 
+                                new THREE.Vector3(0.6, 2.8, 0.6)
+                            );
                             if(pBox.intersectsBox(w)) hit = true;
                         });
                     }
                     if(!hit) player.pos[axis] = next;
                 });
-                player.bobTimer += player.currentSpeed * 3;
+                if(player.isGrounded) player.bobTimer += player.currentSpeed * 3;
             }
 
-            // リーン
+            // リーン & カメラ
             const targetLean = (keys['e']?1:0) - (keys['q']?1:0);
             player.lean += (targetLean - player.lean) * 0.1;
 
-            camera.position.set(player.pos.x, 1.5 + Math.sin(player.bobTimer)*0.05, player.pos.z);
+            // ジャンプ時のカメラ揺れ軽減 & 頭揺れ
+            const bobY = player.isGrounded ? Math.sin(player.bobTimer)*0.05 : 0;
+            camera.position.set(player.pos.x, 1.5 + player.pos.y + bobY, player.pos.z);
+            
             const leanVec = new THREE.Vector3(player.lean * 0.7, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
             camera.position.add(leanVec);
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.15);
 
-            // マップタイル管理
+            // タイル管理
             const ptx = Math.round(player.pos.x/5), ptz = Math.round(player.pos.z/5);
-            for(let x=ptx-VIEW_DIST; x<=ptx+VIEW_DIST; x++) for(let z=ptz-VIEW_DIST; z<=ptz+VIEW_DIST; z++) {
+            for(let x=ptx-5; x<=ptx+5; x++) for(let z=ptz-5; z<=ptz+5; z++) {
                 if(!mapData.has(`${x},${z}`)) { const t = createTile(x,z); mapData.set(`${x},${z}`,t); scene.add(t.mesh); }
             }
-
             renderer.render(scene, camera);
         }
         animate();
