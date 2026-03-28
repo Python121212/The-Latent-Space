@@ -3,56 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Mobile Optimized</title>
+    <title>The Backrooms - UI Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: sans-serif; user-select: none; }
         canvas { display: block; image-rendering: pixelated; }
         
-        /* ステータスバー（左上） */
-        #stats { position: absolute; top: 15px; left: 15px; color: #fff; font-size: 12px; pointer-events: none; z-index: 100; }
-        #stamina-bar { width: 100px; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; border-radius: 2px; }
-        #stamina-fill { width: 100%; height: 100%; background: #ffeb3b; border-radius: 2px; }
-
-        /* スタートメッセージ */
-        #lock-msg { 
-            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-            background: rgba(0,0,0,0.7); color: #fff; z-index: 300; transition: opacity 0.5s;
+        /* 最前面のスタート画面（ここを確実に消えるように修正） */
+        #lock-overlay { 
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8); color: #fff; 
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999; cursor: pointer; text-align: center;
+            transition: opacity 0.3s;
         }
 
-        /* --- モバイル用UIレイアウト --- */
-        #mobile-ui { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
-        
-        /* 左下：ジョイスティック */
-        .joy-container { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; pointer-events: auto; }
-        #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.08); border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
-        #joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        #stats { position: absolute; top: 15px; left: 15px; color: #fff; font-size: 12px; pointer-events: none; z-index: 100; }
+        #stamina-bar { width: 100px; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; }
+        #stamina-fill { width: 100%; height: 100%; background: #ffeb3b; }
 
-        /* 右下：扇形アクションボタン */
-        .action-group { position: absolute; bottom: 30px; right: 30px; width: 220px; height: 220px; pointer-events: none; }
+        /* モバイルUI */
+        #mobile-ui { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
+        .joy-container { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; pointer-events: auto; }
+        #joystick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.08); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        #joystick-stick { width: 50px; height: 50px; background: rgba(255,255,255,0.3); border-radius: 50%; }
+
+        .action-group { position: absolute; bottom: 30px; right: 30px; width: 200px; height: 200px; pointer-events: none; }
         .btn { 
             position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center;
             background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #fff;
-            border-radius: 50%; font-weight: bold; font-size: 14px; backdrop-filter: blur(4px);
-            -webkit-tap-highlight-color: transparent; transition: background 0.1s, transform 0.1s;
+            border-radius: 50%; font-weight: bold; font-size: 14px; -webkit-tap-highlight-color: transparent;
         }
-        .btn:active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
-        
-        /* 各ボタンの配置（扇形） */
-        #btn-jump { bottom: 85px; right: 85px; width: 85px; height: 85px; font-size: 16px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); }
-        #btn-q { bottom: 140px; right: 0; width: 65px; height: 65px; }
-        #btn-e { bottom: 0; right: 140px; width: 65px; height: 65px; }
-        #btn-shift { bottom: 0; right: 0; width: 80px; height: 80px; border-radius: 20px; font-size: 13px; }
-
+        .btn:active { background: rgba(255,255,255,0.4); }
+        #btn-jump { bottom: 80px; right: 80px; width: 80px; height: 80px; font-size: 16px; background: rgba(255,255,255,0.2); }
+        #btn-q { bottom: 130px; right: 0; width: 60px; height: 60px; }
+        #btn-e { bottom: 0; right: 130px; width: 60px; height: 60px; }
+        #btn-shift { bottom: 0; right: 0; width: 80px; height: 80px; border-radius: 15px; }
     </style>
 </head>
 <body>
-    <div id="lock-msg" onclick="this.style.opacity='0';setTimeout(()=>this.style.display='none',500)">TOUCH TO START</div>
+    <!-- タッチで即座に自分自身を消す設定 -->
+    <div id="lock-overlay" onclick="startApp()" ontouchstart="startApp()">
+        <div>
+            <h1 style="margin:0; font-size: 24px;">THE BACKROOMS</h1>
+            <p style="opacity: 0.6;">TOUCH TO START</p>
+        </div>
+    </div>
+
     <div id="stats">LVL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
 
     <div id="mobile-ui">
-        <div class="joy-container">
-            <div id="joystick-base"><div id="joystick-stick"></div></div>
-        </div>
+        <div class="joy-container"><div id="joystick-base"><div id="joystick-stick"></div></div></div>
         <div class="action-group">
             <div id="btn-jump" class="btn">JUMP</div>
             <div id="btn-q" class="btn">Q</div>
@@ -62,6 +62,21 @@
     </div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+    <script>
+        // グローバルに関数を定義して、HTMLから直接呼べるようにする
+        window.startApp = function() {
+            const overlay = document.getElementById('lock-overlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 300); // 完全に消去
+            }
+            // PC版のロックも試行
+            if (typeof renderer !== 'undefined' && renderer.domElement.requestPointerLock) {
+                renderer.domElement.requestPointerLock();
+            }
+        };
+    </script>
+
     <script type="module">
         import * as THREE from 'three';
 
@@ -73,6 +88,7 @@
         camera.rotation.order = 'YXZ';
         
         const renderer = new THREE.WebGLRenderer({ antialias: false });
+        window.renderer = renderer; // グローバル参照用
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * 0.7); 
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
@@ -86,7 +102,7 @@
         };
         const keys = {};
 
-        // --- モバイル入力 (独立マルチタッチ) ---
+        // 入力設定
         const setupBtn = (id, key, callback) => {
             const el = document.getElementById(id);
             el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; if(callback) callback(); }, { passive: false });
@@ -94,15 +110,15 @@
         };
         setupBtn('btn-q', 'q'); setupBtn('btn-e', 'e'); setupBtn('btn-shift', 'shift'); setupBtn('btn-jump', 'space', jump);
 
-        // スティック & 視点
+        // スティック
         let jActive = false, jTouchId = null, jInput = { x: 0, z: 0 };
         const jBase = document.getElementById('joystick-base'), jStick = document.getElementById('joystick-stick');
-        
         jBase.addEventListener('touchstart', e => {
             e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier;
             updateJoystick(e.changedTouches[0]);
         }, { passive: false });
 
+        // 視点移動とスティック移動の統合
         let lookId = null, lX, lY;
         renderer.domElement.addEventListener('touchstart', e => {
             for(let t of e.changedTouches) {
@@ -138,18 +154,7 @@
 
         function jump() { if(player.isGrounded) { player.velY = 0.13; player.isGrounded = false; } }
 
-        // PCサポート
-        window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.code === 'Space') jump(); });
-        window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-        document.addEventListener('mousedown', () => { if(!document.pointerLockElement) renderer.domElement.requestPointerLock(); });
-        document.addEventListener('mousemove', e => {
-            if (document.pointerLockElement === renderer.domElement) {
-                player.rot.y -= e.movementX * 0.002;
-                player.rot.x = Math.max(-1.4, Math.min(1.4, player.rot.x - e.movementY * 0.002));
-            }
-        });
-
-        // --- マップ & アニメーション ---
+        // --- マップ & ループ ---
         const mapData = new Map();
         function createTile(tx, tz) {
             const g = new THREE.Group();
@@ -179,9 +184,7 @@
             const mz = (keys['s']?1:0) - (keys['w']?1:0) + jInput.z;
             const isMoving = Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05;
 
-            if (player.stamina <= 0) player.isExhausted = true;
-            if (player.stamina >= 25) player.isExhausted = false;
-            const isSprinting = keys['shift'] && !player.isExhausted && isMoving;
+            const isSprinting = keys['shift'] && player.stamina > 0 && isMoving;
             player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -1.2 : 0.7)));
             document.getElementById('stamina-fill').style.width = player.stamina + '%';
 
