@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Audio Fixed</title>
+    <title>The Backrooms - Audio Final Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
         canvas { display: block; }
@@ -96,12 +96,19 @@
         const audioLoader = new THREE.AudioLoader();
         
         let isPaused = false;
-        let currentHumVolume = 0.5; // スライダーのデフォルト値(50%)と一致させる
+        let isGameStarted = false; // アプリが開始されたかのフラグ
 
+        // Hum音のロード
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
-            humSound.setVolume(currentHumVolume);
+            humSound.setVolume(document.getElementById('vol-slider').value / 100);
+            // ロード完了時にすでにゲームが始まっていれば再生
+            if (isGameStarted) {
+                humSound.play();
+            }
+        }, undefined, (err) => {
+            console.error("Hum Audio Load Error:", err);
         });
 
         audioLoader.load('footstep.mp3', (buffer) => {
@@ -109,16 +116,13 @@
             footstepSound.setVolume(0.6);
         });
 
-        // 音声を強制的に有効化・更新する関数
         function activateAudio() {
             if (listener.context.state === 'suspended') {
                 listener.context.resume();
             }
-            // スライダーの現在値を取得して適用
-            const vol = document.getElementById('vol-slider').value / 100;
-            if (humSound.buffer) {
-                humSound.setVolume(vol);
-                if (!humSound.isPlaying) humSound.play();
+            isGameStarted = true;
+            if (humSound.buffer && !humSound.isPlaying) {
+                humSound.play();
             }
         }
 
@@ -131,6 +135,7 @@
                     activateAudio();
                 } else {
                     document.exitPointerLock();
+                    // メニュー中はHumを少し下げるなどの演出も可能ですが、一旦維持
                 }
             }
         };
@@ -151,8 +156,7 @@
         volSlider.addEventListener('input', (e) => {
             const val = e.target.value;
             document.getElementById('vol-val').textContent = val;
-            currentHumVolume = val / 100;
-            if(humSound.buffer) humSound.setVolume(currentHumVolume);
+            if(humSound.buffer) humSound.setVolume(val / 100);
         });
 
         // --- プレイヤー & 入力 ---
