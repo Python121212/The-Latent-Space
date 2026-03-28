@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Menu Update</title>
+    <title>The Backrooms - Quality Settings</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Courier New', Courier, monospace; user-select: none; }
-        canvas { display: block; }
+        canvas { display: block; image-rendering: pixelated; } /* 画質変更時に粗さを強調 */
         
         /* --- ローディング --- */
         #loading-screen {
@@ -42,11 +42,20 @@
 
         /* --- 設定パネル（共通） --- */
         .settings-panel {
-            display: none; position: absolute; width: 280px; padding: 20px; 
+            display: none; position: absolute; width: 280px; padding: 25px; 
             background: #1a1a0d; border: 1px solid #444; box-shadow: 0 0 30px #000; z-index: 100;
         }
         .settings-panel h2 { font-size: 18px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; letter-spacing: 3px; }
         .setting-row { margin: 20px 0; font-size: 13px; text-align: left; }
+        
+        /* ラジオボタン風セレクター */
+        .quality-selector { display: flex; gap: 10px; margin-top: 8px; }
+        .q-btn { 
+            flex: 1; padding: 8px; background: #2a2a1a; border: 1px solid #444; 
+            color: #888; cursor: pointer; font-size: 11px; 
+        }
+        .q-btn.active { background: #dbd4a2; color: #000; font-weight: bold; border-color: #dbd4a2; }
+
         input[type=range] { width: 100%; accent-color: #dbd4a2; margin-top: 8px; cursor: pointer; }
 
         /* --- ポーズメニュー --- */
@@ -85,6 +94,13 @@
         <div id="home-settings" class="settings-panel">
             <h2>SETTINGS</h2>
             <div class="setting-row">
+                QUALITY:
+                <div class="quality-selector">
+                    <button class="q-btn" onclick="setQuality(0.4, this)">LOW</button>
+                    <button class="q-btn active" onclick="setQuality(1.0, this)">HIGH</button>
+                </div>
+            </div>
+            <div class="setting-row">
                 AMBIENT HUM: <span class="vol-txt">50</span>%
                 <input type="range" class="vol-slider" min="0" max="100" value="50">
             </div>
@@ -96,6 +112,13 @@
     <div id="pause-menu" class="overlay">
         <div class="settings-panel" style="display:block; position:relative;">
             <h2>PAUSED</h2>
+            <div class="setting-row">
+                QUALITY:
+                <div class="quality-selector">
+                    <button class="q-btn" id="q-low-pause" onclick="setQuality(0.4, this)">LOW</button>
+                    <button class="q-btn active" id="q-high-pause" onclick="setQuality(1.0, this)">HIGH</button>
+                </div>
+            </div>
             <div class="setting-row">
                 AMBIENT HUM: <span class="vol-txt">50</span>%
                 <input type="range" class="vol-slider" min="0" max="100" value="50">
@@ -121,9 +144,9 @@
         scene.background = new THREE.Color(0x1a1a0d);
         scene.fog = new THREE.Fog(0x1a1a0d, 2, 12);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 25);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: false }); // 画質調整のためアンチエイリアスOFF
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
         const listener = new THREE.AudioListener();
@@ -132,18 +155,30 @@
         const audioLoader = new THREE.AudioLoader();
         
         let isPaused = false, isGameStarted = false;
-        let humLoaded = false;
+        let currentPixelRatio = window.devicePixelRatio;
 
         audioLoader.load('hum.mp3', (buffer) => {
             humSound.setBuffer(buffer);
             humSound.setLoop(true);
             humSound.setVolume(0.5);
-            humLoaded = true;
             document.getElementById('loading-screen').style.display = 'none';
             document.getElementById('lock-overlay').style.display = 'flex';
         });
 
-        // 設定の連動処理
+        // 設定：画質変更
+        window.setQuality = (scale, btn) => {
+            currentPixelRatio = window.devicePixelRatio * scale;
+            renderer.setPixelRatio(currentPixelRatio);
+            
+            // ボタンの見た目を更新
+            document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+            const label = btn.innerText;
+            document.querySelectorAll('.q-btn').forEach(b => {
+                if(b.innerText === label) b.classList.add('active');
+            });
+        };
+
+        // 設定：音量変更の連動
         const sliders = document.querySelectorAll('.vol-slider');
         const volTxts = document.querySelectorAll('.vol-txt');
         sliders.forEach(s => {
@@ -183,8 +218,8 @@
             renderer.domElement.requestPointerLock();
         };
 
-        // --- 簡易ゲームエンジン部分 ---
-        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 }, stamina: 100 };
+        // --- ゲームエンジン ---
+        const player = { pos: new THREE.Vector3(0, 0, 0), rot: { x: 0, y: 0 } };
         const keys = {};
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
@@ -231,6 +266,12 @@
             renderer.render(scene, camera);
         }
         animate();
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
     </script>
 </body>
 </html>
