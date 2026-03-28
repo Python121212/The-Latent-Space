@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Forced Walk Update</title>
+    <title>The Backrooms - Fix Jitter Loop</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
         #ui { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; pointer-events: none; text-shadow: 1px 1px #000; }
         #stamina-bar { width: 100px; height: 4px; background: #555; margin-top: 5px; }
-        #stamina-fill { width: 100%; height: 100%; background: #eee; transition: background 0.2s; }
+        #stamina-fill { width: 100%; height: 100%; background: #eee; }
         #msg { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #aaa; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">Q/E: Lean | Shift: Run (Auto-walk when tired)</div>
+    <div id="msg">Q/E: Lean | Shift: Run</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -44,7 +44,7 @@
             pos: new THREE.Vector3(0, 0, 0),
             rot: { x: 0, y: 0 },
             stamina: 100,
-            isExhausted: false, // スタミナ切れフラグ
+            isExhausted: false, 
             lean: 0,
             bobTimer: 0,
             currentSpeed: 0
@@ -102,33 +102,33 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // 1. 入力取得
             const mx = (keys['d']?1:0) - (keys['a']?1:0);
             const mz = (keys['s']?1:0) - (keys['w']?1:0);
-            const isInputMoving = mx !== 0 || mz !== 0;
+            const isMovingInput = mx !== 0 || mz !== 0;
 
-            // --- 強制歩行ロジック ---
-            if (player.stamina <= 0) {
-                player.isExhausted = true; // 息切れ開始
-            }
-            if (player.stamina >= 15) {
-                player.isExhausted = false; // 15%まで回復したら走れる準備OK
-            }
+            // 2. スタミナ状態の更新（ここを厳格化）
+            if (player.stamina <= 0.5) player.isExhausted = true; // ほぼ0で息切れ
+            if (player.stamina >= 30) player.isExhausted = false; // 30%まで回復するまで走れない
 
-            // 走れる条件: シフトが押されている ＆ 息切れしていない ＆ 移動している
-            const isSprinting = keys['shift'] && !player.isExhausted && isInputMoving;
-            
-            // スタミナ消費・回復
-            player.stamina = Math.max(0, Math.min(100, player.stamina + (isSprinting ? -1.0 : 0.6)));
-            
+            // シフトを押していても、息切れ中なら強制的に走りをオフ
+            const finalSprinting = keys['shift'] && !player.isExhausted && isMovingInput;
+
+            // 3. スタミナの増減
+            player.stamina += finalSprinting ? -1.2 : 0.5;
+            player.stamina = Math.max(0, Math.min(100, player.stamina));
+
             const sFill = document.getElementById('stamina-fill');
             sFill.style.width = player.stamina + '%';
-            sFill.style.background = player.isExhausted ? '#ff4444' : '#eeeeee';
+            sFill.style.background = player.isExhausted ? '#ff3333' : '#eee';
 
-            // 速度の決定（補間を強めにしてガクつきを消す）
-            const targetSpeed = isInputMoving ? (isSprinting ? 0.13 : 0.07) : 0;
-            player.currentSpeed += (targetSpeed - player.currentSpeed) * 0.12;
+            // 4. 速度の計算（ターゲットに向かって補間）
+            const targetSpeed = isMovingInput ? (finalSprinting ? 0.13 : 0.07) : 0;
+            // 補間係数を少し下げて(0.08)より滑らかに
+            player.currentSpeed += (targetSpeed - player.currentSpeed) * 0.08;
 
-            if (player.currentSpeed > 0.005) {
+            // 5. 衝突判定と移動
+            if (player.currentSpeed > 0.001) {
                 const dir = new THREE.Vector3(mx, 0, mz).normalize().applyEuler(new THREE.Euler(0, player.rot.y, 0));
                 ['x', 'z'].forEach(axis => {
                     const next = player.pos[axis] + dir[axis] * player.currentSpeed;
@@ -144,18 +144,20 @@
                     }
                     if(!hit) player.pos[axis] = next;
                 });
+                // ボブタイマーの進行を現在の速度に完全に同期
                 player.bobTimer += player.currentSpeed * 2.5;
+            } else {
+                player.bobTimer *= 0.9;
             }
 
-            // リーン
+            // 6. リーン（傾き）
             const targetLean = (keys['e'] ? 1 : 0) - (keys['q'] ? 1 : 0);
             player.lean += (targetLean - player.lean) * 0.1;
 
-            // カメラとボブの適用
-            // 速度が速いほど揺れも大きくする
+            // 7. カメラ更新（リセットしてから適用）
             const bobFactor = player.currentSpeed * 0.5;
             const bobY = Math.sin(player.bobTimer) * bobFactor;
-            const bobZ = Math.cos(player.bobTimer) * (bobFactor * 0.5);
+            const bobZ = Math.cos(player.bobTimer) * (bobFactor * 0.4);
             const leanOffset = new THREE.Vector3(player.lean * 0.7, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
 
             camera.position.set(player.pos.x, 1.5 + bobY, player.pos.z);
