@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Backrooms - Lean Inverted</title>
+    <title>The Backrooms - Lean Key Swapped</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a10; touch-action: none; font-family: sans-serif; }
         canvas { display: block; image-rendering: pixelated; }
@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="ui">LEVEL 0<div id="stamina-bar"><div id="stamina-fill"></div></div></div>
-    <div id="msg">Q: Lean Right / E: Lean Left</div>
+    <div id="msg">Q: Lean Left / E: Lean Right</div>
 
     <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
     <script type="module">
@@ -44,7 +44,7 @@
             pos: new THREE.Vector3(0, 1.5, 0), 
             rot: { x: 0, y: 0 },
             stamina: 100,
-            lean: 0 // 正の値で右、負の値で左
+            lean: 0 // Q(左)で-1.0, E(右)で1.0へ向かう
         };
         const keys = {};
 
@@ -120,18 +120,18 @@
                 player.pos.y = 1.5 + Math.sin(time * 10) * 0.02;
             }
 
-            // --- LEAN INVERTED ---
-            // Qで右(1.0)、Eで左(-1.0)
-            const targetLean = (keys['q'] ? 1 : 0) - (keys['e'] ? 1 : 0);
+            // --- LEAN SWAPPED ---
+            // Eで右(1.0), Qで左(-1.0)
+            const targetLean = (keys['e'] ? 1 : 0) - (keys['q'] ? 1 : 0);
             player.lean += (targetLean - player.lean) * 0.15;
 
-            // 1. 位置のオフセット（右方向にずらす）
+            // 1. 位置のオフセット
             const leanDist = player.lean * 0.8; 
             const leanOffset = new THREE.Vector3(leanDist, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
             camera.position.copy(player.pos).add(leanOffset);
             
-            // 2. 回転（首を逆方向に傾ける）
-            // leanが正(Q)のとき、視界を右に傾ける
+            // 2. 回転（首を傾ける）
+            // leanが正(E:右)のとき、視界を右（負のZ回転）に傾ける
             camera.rotation.set(player.rot.x, player.rot.y, -player.lean * 0.25);
             
             updateMap();
